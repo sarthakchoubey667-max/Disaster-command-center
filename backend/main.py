@@ -1968,6 +1968,7 @@ app.add_middleware(
     allow_origins=[
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://disaster-command-center-4vul.onrender.com",
     "https://disaster-command-center-1.onrender.com",
     ],
 
