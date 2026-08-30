@@ -1966,8 +1966,9 @@ app.add_middleware(
     CORSMiddleware,
 
     allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://disaster-command-center-1.onrender.com",
     ],
 
     allow_credentials=True,
