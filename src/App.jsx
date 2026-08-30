@@ -1,0 +1,1720 @@
+import {
+  AlertTriangle,
+  Bell,
+  Camera,
+  CloudRain,
+  Droplets,
+  MapPin,
+  Menu,
+  Radio,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
+import "./App.css";
+import DisasterMap from "./DisasterMap";
+import SensorChart from "./SensorChart";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const REFRESH_INTERVAL = 5000;
+
+const DEFAULT_RECOMMENDATIONS = [
+  "Evacuate vulnerable residents from Zone A.",
+  "Deploy Rescue Team 2 to Sector 4.",
+  "Bridge Road may become inaccessible within 30 minutes.",
+  "Move Ambulance 04 closer to Government School shelter.",
+];
+
+const formatNumber = (value, digits = 1) => {
+  const number = Number(value);
+
+  return Number.isFinite(number)
+    ? number.toFixed(digits)
+    : "--";
+};
+
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) {
+    return "Waiting for live data";
+  }
+
+  const date = new Date(timestamp);
+
+  return Number.isNaN(date.getTime())
+    ? String(timestamp)
+    : date.toLocaleString();
+};
+
+const normalizeArray = (value) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  return [];
+};
+
+function App() {
+  const [sensorData, setSensorData] = useState(null);
+  const [alertsData, setAlertsData] = useState(null);
+  const [aiData, setAiData] = useState(null);
+
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [sensorError, setSensorError] = useState("");
+
+  const [analyzing, setAnalyzing] = useState(false);
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false);
+
+  const [aiRisk, setAiRisk] = useState(null);
+  const [riskTrend, setRiskTrend] = useState(null);
+  const [riskHistory, setRiskHistory] = useState([]);
+
+  /*
+   * ------------------------------------------------------------
+   * LOAD DASHBOARD DATA
+   * ------------------------------------------------------------
+   *
+   * Primary endpoint:
+   *   /api/dashboard
+   *
+   * Fallback endpoints:
+   *   /api/sensors
+   *   /api/alerts
+   *   /api/ai/recommendations
+   *   /api/ai/risk-history
+   *
+   * The function is called once immediately and then every 5 sec.
+   */
+  const loadBackendData = useCallback(async () => {
+    try {
+      const dashboardResponse = await fetch(
+        `${API_BASE_URL}/api/dashboard`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      if (!dashboardResponse.ok) {
+        throw new Error(
+          `Dashboard API returned ${dashboardResponse.status}`
+        );
+      }
+
+      const dashboard = await dashboardResponse.json();
+
+      const sensors =
+        dashboard?.sensors ??
+        dashboard?.sensor_data ??
+        dashboard?.sensorData;
+
+      const alerts = dashboard?.alerts;
+
+      const recommendationsData =
+        dashboard?.recommendations;
+
+      const risk =
+        dashboard?.risk?.risk ??
+        dashboard?.risk;
+
+      if (sensors) {
+        setSensorData(sensors);
+      }
+
+      if (alerts) {
+        setAlertsData(alerts);
+      }
+
+      if (recommendationsData) {
+        setAiData(recommendationsData);
+      }
+
+      if (risk) {
+        setAiRisk(risk);
+
+        setRiskTrend(
+          dashboard?.risk?.trend
+            ? dashboard.risk.trend
+            : {
+                trend:
+                  risk?.risk_direction ??
+                  "STABLE",
+                change:
+                  risk?.risk_velocity ??
+                  0,
+              }
+        );
+      }
+
+      setBackendOnline(true);
+      setSensorError("");
+
+      /*
+       * Risk history is intentionally fetched separately.
+       * This allows the dashboard endpoint to remain compatible
+       * with older backend versions.
+       */
+      try {
+        const historyResponse = await fetch(
+          `${API_BASE_URL}/api/ai/risk-history`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        if (historyResponse.ok) {
+          const historyData =
+            await historyResponse.json();
+
+          setRiskHistory(
+            normalizeArray(historyData?.history)
+          );
+        }
+      } catch (historyError) {
+        console.warn(
+          "Risk history unavailable:",
+          historyError
+        );
+      }
+    } catch (dashboardError) {
+      console.warn(
+        "Dashboard endpoint unavailable. Using fallback APIs.",
+        dashboardError
+      );
+
+      /*
+       * ----------------------------------------------------------
+       * FALLBACK API MODE
+       * ----------------------------------------------------------
+       */
+      try {
+        const [
+          sensorResponse,
+          alertsResponse,
+          aiResponse,
+          historyResponse,
+        ] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/sensors`, {
+            cache: "no-store",
+          }),
+
+          fetch(`${API_BASE_URL}/api/alerts`, {
+            cache: "no-store",
+          }),
+
+          fetch(
+            `${API_BASE_URL}/api/ai/recommendations`,
+            {
+              cache: "no-store",
+            }
+          ),
+
+          fetch(
+            `${API_BASE_URL}/api/ai/risk-history`,
+            {
+              cache: "no-store",
+            }
+          ),
+        ]);
+
+        if (!sensorResponse.ok) {
+          throw new Error(
+            `Sensor API returned ${sensorResponse.status}`
+          );
+        }
+
+        const sensorJson =
+          await sensorResponse.json();
+
+        setSensorData(sensorJson);
+
+        if (alertsResponse.ok) {
+          setAlertsData(
+            await alertsResponse.json()
+          );
+        }
+
+        if (aiResponse.ok) {
+          setAiData(
+            await aiResponse.json()
+          );
+        }
+
+        if (historyResponse.ok) {
+          const historyData =
+            await historyResponse.json();
+
+          setRiskHistory(
+            normalizeArray(historyData?.history)
+          );
+        }
+
+        setBackendOnline(true);
+        setSensorError("");
+      } catch (error) {
+        console.error(
+          "Backend connection failed:",
+          error
+        );
+
+        setBackendOnline(false);
+
+        setSensorError(
+          "Live sensor data is unavailable. Check that the FastAPI server is running."
+        );
+      }
+    }
+  }, []);
+
+  /*
+   * ------------------------------------------------------------
+   * AI INTELLIGENT PREDICTION
+   * ------------------------------------------------------------
+   */
+  const runAIAnalysis = async () => {
+    setAnalyzing(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/ai/intelligent-prediction`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `AI Prediction API returned ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+
+      /*
+       * Provide a safe recommendation if the backend
+       * doesn't return one.
+       */
+      if (!data?.recommended_action) {
+        data.recommended_action =
+          data?.risk_level === "CRITICAL"
+            ? "Prioritize immediate review of the affected zone and continuously monitor incoming sensor data."
+            : data?.risk_level === "HIGH"
+              ? "Increase monitoring frequency and prioritize the affected zone for response planning."
+              : "Continue monitoring sensor conditions and watch for an increasing risk trend.";
+      }
+
+      setAiRisk(data);
+
+      setRiskTrend({
+        trend:
+          data?.risk_direction ??
+          data?.acceleration_direction ??
+          "STABLE",
+
+        change:
+          data?.risk_velocity ??
+          data?.risk_acceleration ??
+          0,
+      });
+
+      setShowAIAnalysis(true);
+
+      /*
+       * Refresh risk history after a new AI analysis.
+       */
+      try {
+        const historyResponse = await fetch(
+          `${API_BASE_URL}/api/ai/risk-history`,
+          {
+            cache: "no-store",
+          }
+        );
+
+        if (historyResponse.ok) {
+          const historyData =
+            await historyResponse.json();
+
+          setRiskHistory(
+            normalizeArray(historyData?.history)
+          );
+        }
+      } catch (historyError) {
+        console.warn(
+          "Unable to refresh risk history:",
+          historyError
+        );
+      }
+    } catch (error) {
+      console.error(
+        "AI analysis failed:",
+        error
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  /*
+   * ------------------------------------------------------------
+   * LIVE 5-SECOND POLLING
+   * ------------------------------------------------------------
+   */
+  useEffect(() => {
+    let mounted = true;
+
+    const refresh = async () => {
+      if (!mounted) {
+        return;
+      }
+
+      await loadBackendData();
+    };
+
+    refresh();
+
+    const intervalId = setInterval(
+      refresh,
+      REFRESH_INTERVAL
+    );
+
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
+  }, [loadBackendData]);
+
+  /*
+   * ------------------------------------------------------------
+   * DERIVED DATA
+   * ------------------------------------------------------------
+   */
+
+  const alertList = normalizeArray(
+    alertsData?.alerts ?? alertsData
+  );
+
+  const recommendationList = normalizeArray(
+    aiData?.recommendations
+  );
+
+  const displayedRecommendations =
+    recommendationList.length > 0
+      ? recommendationList
+      : DEFAULT_RECOMMENDATIONS;
+
+  const stats = [
+    {
+      title: "Overall Risk",
+      value:
+        aiRisk?.adaptive_risk_score ??
+        "--",
+      unit: "/100",
+      subtitle:
+        aiRisk?.risk_level ??
+        "WAITING",
+      icon: ShieldAlert,
+      type: "danger",
+    },
+
+    {
+      title: "People at Risk",
+      value: "1,248",
+      subtitle: "Across 6 zones",
+      icon: Users,
+      type: "warning",
+    },
+
+    {
+      title: "Water Level",
+      value: formatNumber(
+        sensorData?.water_level,
+        2
+      ),
+      unit: " m",
+      subtitle: "Live sensor",
+      icon: Droplets,
+      type: "info",
+    },
+
+    {
+      title: "Rainfall",
+      value: formatNumber(
+        sensorData?.rainfall,
+        1
+      ),
+      unit: " mm",
+      subtitle: "Live sensor",
+      icon: CloudRain,
+      type: "normal",
+    },
+  ];
+
+  const liveSensors = [
+    {
+      label: "Water Level",
+      value: formatNumber(
+        sensorData?.water_level,
+        2
+      ),
+      unit: "m",
+      note: "Live sensor",
+    },
+
+    {
+      label: "Rainfall",
+      value: formatNumber(
+        sensorData?.rainfall,
+        1
+      ),
+      unit: "mm",
+      note: "Current reading",
+    },
+
+    {
+      label: "Flow Rate",
+      value: formatNumber(
+        sensorData?.flow_rate,
+        1
+      ),
+      unit: "m³/s",
+      note: "Live sensor",
+    },
+
+    {
+      label: "Temperature",
+      value: formatNumber(
+        sensorData?.temperature,
+        1
+      ),
+      unit: "°C",
+      note: "Weather reading",
+    },
+
+    {
+      label: "Humidity",
+      value: formatNumber(
+        sensorData?.humidity,
+        1
+      ),
+      unit: "%",
+      note: "Weather reading",
+    },
+
+    {
+      label: "Wind Speed",
+      value: formatNumber(
+        sensorData?.wind_speed,
+        1
+      ),
+      unit: "",
+      note: "Weather reading",
+    },
+  ];
+
+  const latestRisk =
+    riskHistory.length > 0
+      ? riskHistory[riskHistory.length - 1]
+      : null;
+
+  /*
+   * ------------------------------------------------------------
+   * RENDER
+   * ------------------------------------------------------------
+   */
+  return (
+    <>
+      <style>{`
+        .ai-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: rgba(2, 6, 23, 0.78);
+          backdrop-filter: blur(8px);
+        }
+
+        .ai-modal {
+          position: relative;
+          width: min(760px, 94vw);
+          max-height: min(88vh, 820px);
+          overflow: auto;
+          padding: 28px;
+          border: 1px solid rgba(148, 163, 184, 0.22);
+          border-radius: 22px;
+          background: linear-gradient(
+            145deg,
+            #172554,
+            #111a3d
+          );
+          color: #eef2ff;
+          box-shadow:
+            0 30px 90px rgba(0, 0, 0, 0.55);
+        }
+
+        .ai-modal::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .ai-modal::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.35);
+          border-radius: 10px;
+        }
+
+        .close-ai {
+          position: absolute;
+          right: 18px;
+          top: 14px;
+          width: 36px;
+          height: 36px;
+          border: 0;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.08);
+          color: #fff;
+          font-size: 26px;
+          cursor: pointer;
+        }
+
+        .close-ai:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
+
+        .ai-modal-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 20px;
+          padding-right: 42px;
+          margin-bottom: 22px;
+        }
+
+        .ai-modal-kicker {
+          display: block;
+          font-size: 11px;
+          letter-spacing: 1.6px;
+          color: #67e8f9;
+          font-weight: 800;
+          margin-bottom: 6px;
+        }
+
+        .ai-modal h2 {
+          margin: 0;
+          font-size: 27px;
+        }
+
+        .risk-pill {
+          padding: 8px 12px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.7px;
+          background: #334155;
+        }
+
+        .risk-pill.critical {
+          background: #7f1d1d;
+          color: #fecaca;
+        }
+
+        .risk-pill.high {
+          background: #78350f;
+          color: #fed7aa;
+        }
+
+        .risk-pill.moderate {
+          background: #854d0e;
+          color: #fef08a;
+        }
+
+        .risk-pill.low {
+          background: #14532d;
+          color: #bbf7d0;
+        }
+
+        .ai-score-row {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+
+        .ai-score-row > div {
+          padding: 16px;
+          border-radius: 15px;
+          background: rgba(15, 23, 42, 0.48);
+          border: 1px solid rgba(148, 163, 184, 0.15);
+        }
+
+        .ai-score-row span,
+        .ai-detail-grid span {
+          display: block;
+          color: #94a3b8;
+          font-size: 12px;
+          margin-bottom: 7px;
+        }
+
+        .ai-score-row strong {
+          font-size: 22px;
+        }
+
+        .ai-score-row small {
+          font-size: 12px;
+          color: #94a3b8;
+          margin-left: 3px;
+        }
+
+        .ai-section {
+          margin-top: 18px;
+          padding-top: 18px;
+          border-top: 1px solid rgba(148, 163, 184, 0.14);
+        }
+
+        .ai-section h3 {
+          margin: 0 0 13px;
+          font-size: 16px;
+        }
+
+        .ai-detail-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+
+        .ai-detail-grid p {
+          margin: 0;
+          padding: 12px 14px;
+          border-radius: 12px;
+          background: rgba(15, 23, 42, 0.38);
+        }
+
+        .ai-detail-grid strong {
+          font-size: 14px;
+        }
+
+        .ai-action {
+          margin-top: 20px;
+          padding: 16px;
+          border-left: 4px solid #38bdf8;
+          border-radius: 12px;
+          background: rgba(14, 165, 233, 0.09);
+        }
+
+        .ai-action span {
+          font-size: 11px;
+          letter-spacing: 1px;
+          color: #67e8f9;
+          font-weight: 800;
+        }
+
+        .ai-action p {
+          margin: 7px 0 8px;
+          line-height: 1.5;
+        }
+
+        .ai-action strong {
+          font-size: 12px;
+        }
+
+        .modal-recommendations {
+          display: grid;
+          gap: 9px;
+        }
+
+        .modal-recommendations > div {
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+          padding: 11px 12px;
+          border-radius: 11px;
+          background: rgba(15, 23, 42, 0.35);
+        }
+
+        .modal-recommendations b {
+          display: grid;
+          place-items: center;
+          flex: 0 0 26px;
+          height: 26px;
+          border-radius: 8px;
+          background: rgba(99, 102, 241, 0.32);
+          font-size: 12px;
+        }
+
+        .modal-recommendations span {
+          line-height: 1.45;
+          font-size: 13px;
+        }
+
+        @media (max-width: 650px) {
+          .ai-modal-overlay {
+            padding: 10px;
+          }
+
+          .ai-modal {
+            padding: 20px;
+            border-radius: 16px;
+            max-height: 94vh;
+          }
+
+          .ai-modal-head {
+            display: block;
+          }
+
+          .risk-pill {
+            display: inline-block;
+            margin-top: 12px;
+          }
+
+          .ai-score-row {
+            grid-template-columns: 1fr;
+          }
+
+          .ai-detail-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .ai-modal h2 {
+            font-size: 23px;
+          }
+        }
+      `}</style>
+
+      <div className="app">
+
+        {/* =====================================================
+            SIDEBAR
+        ====================================================== */}
+
+        <aside className="sidebar">
+
+          <div className="logo">
+            <div className="logo-icon">
+              <ShieldAlert size={25} />
+            </div>
+
+            <div>
+              <h2>DisasterAI</h2>
+              <span>COMMAND CENTER</span>
+            </div>
+          </div>
+
+          <nav>
+            <a className="active">
+              <ShieldAlert size={19} />
+              Dashboard
+            </a>
+
+            <a>
+              <MapPin size={19} />
+              Disaster Map
+            </a>
+
+            <a>
+              <Radio size={19} />
+              Sensors
+            </a>
+
+            <a>
+              <Camera size={19} />
+              Cameras
+            </a>
+
+            <a>
+              <Users size={19} />
+              Rescue Teams
+            </a>
+
+            <a>
+              <Bell size={19} />
+              Alerts
+              <span className="nav-badge">
+                {alertList.length}
+              </span>
+            </a>
+          </nav>
+
+          <div className="system-status">
+            <div className="status-dot"></div>
+
+            <div>
+              <strong>
+                {backendOnline
+                  ? "System Online"
+                  : "System Offline"}
+              </strong>
+
+              <small>
+                {backendOnline
+                  ? "Sensor API connected"
+                  : "Waiting for FastAPI"}
+              </small>
+            </div>
+          </div>
+
+        </aside>
+
+        {/* =====================================================
+            MAIN CONTENT
+        ====================================================== */}
+
+        <main className="main">
+
+          {/* HEADER */}
+
+          <header className="header">
+
+            <div className="mobile-menu">
+              <Menu size={23} />
+            </div>
+
+            <div>
+              <h1>Disaster Command Center</h1>
+              <p>
+                Real-time disaster intelligence &amp;
+                response system
+              </p>
+            </div>
+
+            <div className="header-right">
+
+              <div className="live-status">
+                <span></span>
+                {backendOnline
+                  ? "LIVE"
+                  : "OFFLINE"}
+              </div>
+
+              <button
+                type="button"
+                className="notification"
+              >
+                <Bell size={20} />
+                <span>{alertList.length}</span>
+              </button>
+
+              <div className="profile">
+                <div className="avatar">
+                  OP
+                </div>
+
+                <div>
+                  <strong>Operator</strong>
+                  <small>Control Room</small>
+                </div>
+              </div>
+
+            </div>
+          </header>
+
+          {/* ===================================================
+              STATISTICS
+          ==================================================== */}
+
+          <section className="stats-grid">
+
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+
+              return (
+                <div
+                  className={`stat-card ${stat.type}`}
+                  key={stat.title}
+                >
+                  <div className="stat-top">
+
+                    <div>
+                      <p>{stat.title}</p>
+
+                      <div className="stat-value">
+                        {stat.value}
+
+                        {stat.unit && (
+                          <span className="stat-unit">
+                            {stat.unit}
+                          </span>
+                        )}
+                      </div>
+
+                      <small>
+                        {stat.subtitle}
+                      </small>
+                    </div>
+
+                    <div className="stat-icon">
+                      <Icon size={23} />
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })}
+
+          </section>
+
+          {/* ===================================================
+              MAP + ALERTS
+          ==================================================== */}
+
+          <section className="content-grid">
+
+            <div className="panel map-panel">
+
+              <div className="panel-header">
+
+                <div>
+                  <h2>Live Disaster Map</h2>
+                  <p>
+                    Current situation overview
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="map-button"
+                >
+                  Full Map
+                </button>
+
+              </div>
+
+              <DisasterMap />
+
+            </div>
+
+            <div className="panel alerts-panel">
+
+              <div className="panel-header">
+
+                <div>
+                  <h2>Active Alerts</h2>
+                  <p>
+                    Latest emergency events
+                  </p>
+                </div>
+
+                <span className="alert-count">
+                  {alertList.length}
+                </span>
+
+              </div>
+
+              <div className="alerts-list">
+
+                {alertList.length > 0 ? (
+                  alertList.map(
+                    (alert, index) => (
+                      <div
+                        className="alert-item"
+                        key={`${alert?.title ?? "alert"}-${index}`}
+                      >
+                        <div
+                          className={`alert-icon ${
+                            alert?.level ?? "warning"
+                          }`}
+                        >
+                          <AlertTriangle size={18} />
+                        </div>
+
+                        <div className="alert-info">
+
+                          <strong>
+                            {alert?.title ??
+                              "Emergency Alert"}
+                          </strong>
+
+                          <span>
+                            <MapPin size={13} />
+                            {alert?.location ??
+                              "Unknown location"}
+                          </span>
+
+                        </div>
+
+                        <small>
+                          {alert?.time ?? "--"}
+                        </small>
+                      </div>
+                    )
+                  )
+                ) : (
+                  <div className="alert-item">
+                    <div className="alert-info">
+                      <strong>
+                        No active alerts
+                      </strong>
+
+                      <span>
+                        System is monitoring live conditions.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              <button
+                type="button"
+                className="view-alerts"
+              >
+                View all alerts
+              </button>
+
+            </div>
+
+          </section>
+
+          {/* ===================================================
+              LOWER GRID
+          ==================================================== */}
+
+          <section className="lower-grid">
+
+            {/* SENSOR MONITORING */}
+
+            <div className="panel sensor-panel">
+
+              <div className="panel-header">
+
+                <div>
+                  <h2>Sensor Monitoring</h2>
+                  <p>River Station 02</p>
+                </div>
+
+                <div className="sensor-online">
+
+                  <span></span>
+
+                  {backendOnline
+                    ? "ONLINE"
+                    : "OFFLINE"}
+
+                </div>
+
+              </div>
+
+              {sensorError && (
+                <p
+                  role="alert"
+                  className="sensor-error"
+                >
+                  {sensorError}
+                </p>
+              )}
+
+              <div className="sensor-data">
+
+                {liveSensors.map(
+                  (sensor) => (
+                    <div
+                      key={sensor.label}
+                    >
+                      <span>
+                        {sensor.label}
+                      </span>
+
+                      <strong>
+                        {sensor.value}{" "}
+                        <small>
+                          {sensor.unit}
+                        </small>
+                      </strong>
+
+                      <small>
+                        {sensor.note}
+                      </small>
+                    </div>
+                  )
+                )}
+
+              </div>
+
+              <div
+                className="sensor-metadata"
+                aria-live="polite"
+              >
+                <p>
+                  <strong>
+                    Data source:
+                  </strong>{" "}
+                  {sensorData?.source ??
+                    "--"}
+                </p>
+
+                <p>
+                  <strong>
+                    Last reading:
+                  </strong>{" "}
+                  {formatTimestamp(
+                    sensorData?.timestamp
+                  )}
+                </p>
+              </div>
+
+              <SensorChart />
+
+            </div>
+
+            {/* AI RISK HISTORY */}
+
+            <div className="panel risk-history-panel">
+
+              <div className="panel-header">
+
+                <div>
+                  <h2>
+                    AI Risk Evolution
+                  </h2>
+
+                  <p>
+                    Latest AI decision history
+                  </p>
+                </div>
+
+                <div className="ai-badge">
+                  LIVE
+                </div>
+
+              </div>
+
+              {riskHistory.length > 0 ? (
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      gap: "6px",
+                      height: "180px",
+                      padding:
+                        "20px 10px 10px",
+                      borderBottom:
+                        "1px solid #e5e7eb",
+                    }}
+                  >
+
+                    {riskHistory.map(
+                      (item, index) => {
+
+                        const score = Number(
+                          item?.risk_score ?? 0
+                        );
+
+                        const safeScore =
+                          Number.isFinite(score)
+                            ? Math.max(
+                                5,
+                                Math.min(
+                                  100,
+                                  score
+                                )
+                              )
+                            : 5;
+
+                        let background =
+                          "#16a34a";
+
+                        if (safeScore >= 80) {
+                          background =
+                            "#dc2626";
+                        } else if (
+                          safeScore >= 60
+                        ) {
+                          background =
+                            "#f59e0b";
+                        }
+
+                        return (
+                          <div
+                            key={`${
+                              item?.timestamp ??
+                              "risk"
+                            }-${index}`}
+                            title={`${
+                              item?.timestamp ??
+                              ""
+                            } — Risk ${
+                              item?.risk_score ??
+                              "--"
+                            }`}
+                            style={{
+                              flex: 1,
+                              height: `${safeScore}%`,
+                              minHeight: "8px",
+                              borderRadius:
+                                "5px 5px 0 0",
+                              background,
+                            }}
+                          />
+                        );
+                      }
+                    )}
+
+                  </div>
+
+                  <p>
+                    Current:{" "}
+                    {latestRisk?.risk_score ??
+                      "--"}
+                    /100 —{" "}
+                    {latestRisk?.risk_level ??
+                      "--"}
+                  </p>
+                </>
+              ) : (
+                <div
+                  style={{
+                    padding: "30px",
+                    textAlign: "center",
+                  }}
+                >
+                  <p>
+                    Collecting AI risk history...
+                  </p>
+                </div>
+              )}
+
+            </div>
+
+            {/* AI RECOMMENDATIONS */}
+
+            <div className="panel ai-panel">
+
+              <div className="panel-header">
+
+                <div>
+                  <h2>
+                    AI Recommendations
+                  </h2>
+
+                  <p>
+                    Decision support engine
+                  </p>
+                </div>
+
+                <div className="ai-badge">
+                  AI
+                </div>
+
+              </div>
+
+              <div className="recommendations">
+
+                {displayedRecommendations.map(
+                  (recommendation, index) => (
+                    <div
+                      className="recommendation"
+                      key={`${recommendation}-${index}`}
+                    >
+                      <div className="recommendation-number">
+                        {index + 1}
+                      </div>
+
+                      <p>
+                        {recommendation}
+                      </p>
+                    </div>
+                  )
+                )}
+
+              </div>
+
+              <button
+                type="button"
+                className="analyze-button"
+                onClick={runAIAnalysis}
+                disabled={analyzing}
+              >
+                {analyzing
+                  ? "Analyzing..."
+                  : "Run AI Analysis"}
+              </button>
+
+            </div>
+
+          </section>
+
+          {/* FOOTER */}
+
+          <footer>
+            <span>
+              DisasterAI v1.0
+            </span>
+
+            <span>
+              Last updated:{" "}
+              {formatTimestamp(
+                sensorData?.timestamp
+              )}
+            </span>
+
+            <span>
+              Data source:{" "}
+              {sensorData?.source ??
+                "Waiting"}
+            </span>
+          </footer>
+
+        </main>
+
+        {/* =====================================================
+            AI ANALYSIS MODAL
+        ====================================================== */}
+
+        {showAIAnalysis && (
+          <div
+            className="ai-modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ai-analysis-title"
+          >
+            <div className="ai-modal">
+
+              <button
+                type="button"
+                className="close-ai"
+                aria-label="Close AI analysis"
+                onClick={() =>
+                  setShowAIAnalysis(false)
+                }
+              >
+                ×
+              </button>
+
+              <div className="ai-modal-head">
+
+                <div>
+                  <span className="ai-modal-kicker">
+                    DISASTERAI DECISION SUPPORT
+                  </span>
+
+                  <h2 id="ai-analysis-title">
+                    🤖 AI Disaster Analysis
+                  </h2>
+                </div>
+
+                <span
+                  className={`risk-pill ${
+                    (
+                      aiRisk?.risk_level ??
+                      ""
+                    ).toLowerCase()
+                  }`}
+                >
+                  {aiRisk?.risk_level ??
+                    "--"}
+                </span>
+
+              </div>
+
+              {/* AI SCORE */}
+
+              <div className="ai-score-row">
+
+                <div>
+                  <span>
+                    Adaptive Risk
+                  </span>
+
+                  <strong>
+                    {formatNumber(
+                      aiRisk?.adaptive_risk_score,
+                      2
+                    )}
+
+                    <small>
+                      /100
+                    </small>
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Flood Probability
+                  </span>
+
+                  <strong>
+                    {formatNumber(
+                      aiRisk?.flood_probability,
+                      1
+                    )}
+
+                    <small>
+                      %
+                    </small>
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Priority
+                  </span>
+
+                  <strong>
+                    {aiRisk?.response_priority ??
+                      "--"}
+                  </strong>
+                </div>
+
+              </div>
+
+              {/* RISK INTELLIGENCE */}
+
+              <section className="ai-section">
+
+                <h3>
+                  Risk Intelligence
+                </h3>
+
+                <div className="ai-detail-grid">
+
+                  <p>
+                    <span>
+                      Risk trend
+                    </span>
+
+                    <strong>
+                      {riskTrend?.trend ??
+                        aiRisk?.risk_direction ??
+                        "--"}
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Risk velocity
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.risk_velocity,
+                        2
+                      )}
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Risk acceleration
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.risk_acceleration,
+                        2
+                      )}
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Temporal state
+                    </span>
+
+                    <strong>
+                      {aiRisk?.temporal_intelligence_state ??
+                        "--"}
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Anomalies detected
+                    </span>
+
+                    <strong>
+                      {aiRisk?.anomaly_count ??
+                        "--"}
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Sensor reliability
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.sensor_reliability,
+                        1
+                      )}
+                      %
+                    </strong>
+                  </p>
+
+                </div>
+
+              </section>
+
+              {/* SENSOR SNAPSHOT */}
+
+              <section className="ai-section">
+
+                <h3>
+                  Live Sensor Snapshot
+                </h3>
+
+                <div className="ai-detail-grid">
+
+                  <p>
+                    <span>
+                      Water level
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.sensor_data
+                          ?.water_level ??
+                          sensorData?.water_level,
+                        2
+                      )}{" "}
+                      m
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Rainfall
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.sensor_data
+                          ?.rainfall ??
+                          sensorData?.rainfall,
+                        1
+                      )}{" "}
+                      mm
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Flow rate
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.sensor_data
+                          ?.flow_rate ??
+                          sensorData?.flow_rate,
+                        1
+                      )}{" "}
+                      m³/s
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Temperature
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.sensor_data
+                          ?.temperature ??
+                          sensorData?.temperature,
+                        1
+                      )}{" "}
+                      °C
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Humidity
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.sensor_data
+                          ?.humidity ??
+                          sensorData?.humidity,
+                        1
+                      )}
+                      %
+                    </strong>
+                  </p>
+
+                  <p>
+                    <span>
+                      Wind speed
+                    </span>
+
+                    <strong>
+                      {formatNumber(
+                        aiRisk?.sensor_data
+                          ?.wind_speed ??
+                          sensorData?.wind_speed,
+                        1
+                      )}
+                    </strong>
+                  </p>
+
+                </div>
+
+              </section>
+
+              {/* AI ACTION */}
+
+              <section className="ai-action">
+
+                <span>
+                  RECOMMENDED ACTION
+                </span>
+
+                <p>
+                  {aiRisk?.recommended_action ??
+                    "Waiting for AI analysis..."}
+                </p>
+
+                <strong>
+                  {aiRisk?.evacuation_required
+                    ? "⚠ Evacuation required"
+                    : "✓ No evacuation triggered by current model"}
+                </strong>
+
+              </section>
+
+              {/* AI RECOMMENDATIONS */}
+
+              <section className="ai-section">
+
+                <h3>
+                  AI Recommendations
+                </h3>
+
+                <div className="modal-recommendations">
+
+                  {displayedRecommendations.map(
+                    (
+                      recommendation,
+                      index
+                    ) => (
+                      <div
+                        key={`${recommendation}-${index}`}
+                      >
+                        <b>
+                          {index + 1}
+                        </b>
+
+                        <span>
+                          {recommendation}
+                        </span>
+                      </div>
+                    )
+                  )}
+
+                </div>
+
+              </section>
+
+            </div>
+          </div>
+        )}
+
+      </div>
+    </>
+  );
+}
+
+export default App;
