@@ -12,8 +12,19 @@ import joblib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from services.imd_service import get_imd_data
+from services.data_fusion_service import get_fused_external_data
+from services.earthquake_service import get_earthquakes
+from services.elevation_service import get_elevation
+from services.geocoding_service import geocode
+from services.river_service import get_river_data
+from services.sachet_service import get_sachet_alerts
+from services.satellite_service import get_satellite_scenes
+from services.weather_service import get_weather_data
 from services.sensor_service import (
     get_latest_sensor_data,
     get_sensor_history,
@@ -2133,6 +2144,59 @@ def imd_weather():
     )
 
     return result
+
+
+# ============================================================
+# EXTERNAL DATA SOURCES / LANDSLIDE FUSION
+# ============================================================
+
+@app.get("/api/external/weather")
+def external_weather(lat: float = 26.1445, lon: float = 91.7362):
+    with state_lock:
+        fallback = latest_sensor_data.copy()
+    return get_weather_data(lat, lon, fallback)
+
+
+@app.get("/api/external/earthquakes")
+def external_earthquakes(lat: float = 26.1445, lon: float = 91.7362, radius_km: float = 250, days: int = 7):
+    return get_earthquakes(lat, lon, radius_km=radius_km, days=days)
+
+
+@app.get("/api/external/elevation")
+def external_elevation(lat: float = 26.1445, lon: float = 91.7362):
+    return get_elevation(lat, lon)
+
+
+@app.get("/api/external/geocode")
+def external_geocode(address: str):
+    return geocode(address=address)
+
+
+@app.get("/api/external/reverse-geocode")
+def external_reverse_geocode(lat: float, lon: float):
+    return geocode(latitude=lat, longitude=lon)
+
+
+@app.get("/api/external/alerts")
+def external_alerts(limit: int = 20):
+    return get_sachet_alerts(limit=limit)
+
+
+@app.get("/api/external/river")
+def external_river(lat: float = 26.1445, lon: float = 91.7362):
+    return get_river_data(lat, lon)
+
+
+@app.get("/api/external/satellite")
+def external_satellite(lat: float = 26.1445, lon: float = 91.7362, days: int = 30, limit: int = 10):
+    return get_satellite_scenes(lat, lon, days=days, limit=limit)
+
+
+@app.get("/api/data-fusion")
+def external_data_fusion(lat: float = 26.1445, lon: float = 91.7362):
+    with state_lock:
+        fallback = latest_sensor_data.copy()
+    return get_fused_external_data(lat, lon, fallback)
 
 
 # ============================================================

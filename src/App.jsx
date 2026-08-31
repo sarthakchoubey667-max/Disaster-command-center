@@ -69,6 +69,7 @@ function App() {
   const [aiRisk, setAiRisk] = useState(null);
   const [riskTrend, setRiskTrend] = useState(null);
   const [riskHistory, setRiskHistory] = useState([]);
+  const [externalData, setExternalData] = useState(null);
 
   /*
    * ------------------------------------------------------------
@@ -382,6 +383,22 @@ function App() {
       clearInterval(intervalId);
     };
   }, [loadBackendData]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${API_BASE_URL}/api/data-fusion`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => data && setExternalData(data))
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          console.warn("External data fusion unavailable:", error);
+        }
+      });
+    return () => controller.abort();
+  }, []);
 
   /*
    * ------------------------------------------------------------
@@ -1351,6 +1368,12 @@ function App() {
               Data source:{" "}
               {sensorData?.source ??
                 "Waiting"}
+            </span>
+
+            <span>
+              External data: {externalData
+                ? `${externalData.available_sources?.length ?? 0}/7 live`
+                : "checking"}
             </span>
           </footer>
 
