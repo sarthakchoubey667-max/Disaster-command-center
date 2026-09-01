@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   Bell,
   Camera,
@@ -6,9 +7,12 @@ import {
   Droplets,
   MapPin,
   Menu,
+  Mountain,
   Radio,
+  Satellite,
   ShieldAlert,
   Users,
+  Waves,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -385,19 +389,32 @@ function App() {
   }, [loadBackendData]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(`${API_BASE_URL}/api/data-fusion`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => data && setExternalData(data))
-      .catch((error) => {
-        if (error.name !== "AbortError") {
-          console.warn("External data fusion unavailable:", error);
-        }
-      });
-    return () => controller.abort();
+    let mounted = true;
+    let controller = new AbortController();
+
+    const loadExternalData = async () => {
+      controller.abort();
+      controller = new AbortController();
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/data-fusion`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`Data fusion API returned ${response.status}`);
+        const data = await response.json();
+        if (mounted) setExternalData(data);
+      } catch (error) {
+        if (error.name !== "AbortError") console.warn("External data fusion unavailable:", error);
+      }
+    };
+
+    loadExternalData();
+    const intervalId = setInterval(loadExternalData, 30000);
+    return () => {
+      mounted = false;
+      controller.abort();
+      clearInterval(intervalId);
+    };
   }, []);
 
   /*
@@ -532,6 +549,17 @@ function App() {
     riskHistory.length > 0
       ? riskHistory[riskHistory.length - 1]
       : null;
+
+  const externalSources = externalData?.sources ?? {};
+  const sourceCards = [
+    { key: "weather", label: "OpenWeather", icon: CloudRain, value: externalSources.weather?.data?.description ?? "Weather intelligence", detail: `${formatNumber(externalSources.weather?.data?.rainfall_1h, 1)} mm rain · ${formatNumber(externalSources.weather?.data?.humidity, 0)}% humidity` },
+    { key: "earthquakes", label: "USGS Earthquakes", icon: Activity, value: `${externalSources.earthquakes?.data?.count ?? 0} recent events`, detail: `${externalSources.earthquakes?.data?.radius_km ?? 250} km monitoring radius` },
+    { key: "elevation", label: "OpenTopography", icon: Mountain, value: `${formatNumber(externalSources.elevation?.data?.elevation_m, 0)} m elevation`, detail: externalSources.elevation?.data?.dem_type ?? "Terrain / DEM intelligence" },
+    { key: "geocoding", label: "Google Geocoding", icon: MapPin, value: externalSources.geocoding?.data?.results?.[0]?.formatted_address ?? "Location resolver", detail: "Coordinate and address context" },
+    { key: "alerts", label: "NDMA SACHET", icon: ShieldAlert, value: `${externalSources.alerts?.data?.count ?? 0} official alerts`, detail: "All-India government warning feed" },
+    { key: "river", label: "NWDP / NWIC", icon: Waves, value: externalSources.river?.data?.water_level != null ? `${formatNumber(externalSources.river.data.water_level, 2)} m water level` : "River intelligence", detail: "Government water-data network" },
+    { key: "satellite", label: "Planet Satellite", icon: Satellite, value: `${externalSources.satellite?.data?.count ?? 0} scenes`, detail: "Remote-sensing coverage" },
+  ];
 
   /*
    * ------------------------------------------------------------
@@ -1348,6 +1376,44 @@ function App() {
 
             </div>
 
+          </section>
+
+          <section className="panel external-sources-panel" aria-labelledby="external-sources-title">
+            <div className="panel-header external-sources-header">
+              <div>
+                <h2 id="external-sources-title">External Intelligence Network</h2>
+                <p>Weather, terrain, seismic, river, satellite and official-alert data fused for landslide analysis</p>
+              </div>
+              <div className="source-summary" aria-live="polite">
+                <span className={externalData ? "source-pulse online" : "source-pulse"}></span>
+                {externalData ? `${externalData.available_sources?.length ?? 0} of 7 live` : "Connecting"}
+              </div>
+            </div>
+
+            <div className="external-source-grid">
+              {sourceCards.map((source) => {
+                const response = externalSources[source.key];
+                const isLive = response?.status === "success";
+                const Icon = source.icon;
+                return (
+                  <article className={`external-source-card ${isLive ? "live" : "fallback"}`} key={source.key}>
+                    <div className="external-source-icon"><Icon size={19} /></div>
+                    <div className="external-source-copy">
+                      <div className="external-source-name"><strong>{source.label}</strong><span>{isLive ? "LIVE" : "FALLBACK"}</span></div>
+                      <p>{source.value}</p>
+                      <small>{isLive ? source.detail : response?.message ?? source.detail}</small>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="fusion-strip">
+              <div><span>Fusion location</span><strong>{externalData?.location ? `${formatNumber(externalData.location.latitude, 4)}, ${formatNumber(externalData.location.longitude, 4)}` : "Waiting for coordinates"}</strong></div>
+              <div><span>Landslide rainfall input</span><strong>{formatNumber(externalData?.landslide_features?.rainfall_mm, 1)} mm</strong></div>
+              <div><span>Official alerts</span><strong>{externalData?.landslide_features?.official_alert_count ?? 0}</strong></div>
+              <div><span>Recent earthquakes</span><strong>{externalData?.landslide_features?.recent_earthquake_count ?? 0}</strong></div>
+            </div>
           </section>
 
           {/* FOOTER */}
