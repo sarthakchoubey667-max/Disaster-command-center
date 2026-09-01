@@ -423,9 +423,21 @@ function App() {
    * ------------------------------------------------------------
    */
 
-  const alertList = normalizeArray(
-    alertsData?.alerts ?? alertsData
-  );
+  const operational = externalData?.operational;
+  const externalSources = externalData?.sources ?? {};
+  const displayedSensors = operational?.sensors
+    ? { ...sensorData, ...operational.sensors }
+    : sensorData;
+  const officialAlerts = normalizeArray(operational?.alerts).map((alert) => ({
+    ...alert,
+    level: "warning",
+    location: alert?.area ?? alert?.location ?? "India",
+    time: alert?.published ? formatTimestamp(alert.published) : "Official feed",
+  }));
+  const alertList =
+    externalSources.alerts?.status === "success" && officialAlerts.length > 0
+      ? officialAlerts
+      : normalizeArray(alertsData?.alerts ?? alertsData);
 
   const recommendationList = normalizeArray(
     aiData?.recommendations
@@ -436,16 +448,32 @@ function App() {
       ? recommendationList
       : DEFAULT_RECOMMENDATIONS;
 
+  const simulationRisk = Number(aiRisk?.adaptive_risk_score);
+  const externalRisk = Number(operational?.risk?.score);
+  const fusedRiskScore = Number.isFinite(simulationRisk) && Number.isFinite(externalRisk)
+    ? Math.round((simulationRisk * 0.7 + externalRisk * 0.3) * 100) / 100
+    : Number.isFinite(simulationRisk)
+      ? simulationRisk
+      : Number.isFinite(externalRisk)
+        ? externalRisk
+        : null;
+  const fusedRiskLevel = fusedRiskScore == null
+    ? "WAITING"
+    : fusedRiskScore >= 80
+      ? "CRITICAL"
+      : fusedRiskScore >= 60
+        ? "HIGH"
+        : fusedRiskScore >= 35
+          ? "MODERATE"
+          : "LOW";
+
   const stats = [
     {
       title: "Overall Risk",
-      value:
-        aiRisk?.adaptive_risk_score ??
-        "--",
+      value: fusedRiskScore ?? "--",
       unit: "/100",
       subtitle:
-        aiRisk?.risk_level ??
-        "WAITING",
+        fusedRiskLevel,
       icon: ShieldAlert,
       type: "danger",
     },
@@ -461,11 +489,11 @@ function App() {
     {
       title: "Water Level",
       value: formatNumber(
-        sensorData?.water_level,
+        displayedSensors?.water_level,
         2
       ),
       unit: " m",
-      subtitle: "Live sensor",
+      subtitle: operational?.sensor_sources?.water_level ?? "Live sensor",
       icon: Droplets,
       type: "info",
     },
@@ -473,11 +501,11 @@ function App() {
     {
       title: "Rainfall",
       value: formatNumber(
-        sensorData?.rainfall,
+        displayedSensors?.rainfall,
         1
       ),
       unit: " mm",
-      subtitle: "Live sensor",
+      subtitle: operational?.sensor_sources?.rainfall ?? "Live sensor",
       icon: CloudRain,
       type: "normal",
     },
@@ -487,61 +515,61 @@ function App() {
     {
       label: "Water Level",
       value: formatNumber(
-        sensorData?.water_level,
+        displayedSensors?.water_level,
         2
       ),
       unit: "m",
-      note: "Live sensor",
+      note: operational?.sensor_sources?.water_level ?? "Live sensor",
     },
 
     {
       label: "Rainfall",
       value: formatNumber(
-        sensorData?.rainfall,
+        displayedSensors?.rainfall,
         1
       ),
       unit: "mm",
-      note: "Current reading",
+      note: operational?.sensor_sources?.rainfall ?? "Current reading",
     },
 
     {
       label: "Flow Rate",
       value: formatNumber(
-        sensorData?.flow_rate,
+        displayedSensors?.flow_rate,
         1
       ),
       unit: "m³/s",
-      note: "Live sensor",
+      note: operational?.sensor_sources?.flow_rate ?? "Live sensor",
     },
 
     {
       label: "Temperature",
       value: formatNumber(
-        sensorData?.temperature,
+        displayedSensors?.temperature,
         1
       ),
       unit: "°C",
-      note: "Weather reading",
+      note: operational?.sensor_sources?.temperature ?? "Weather reading",
     },
 
     {
       label: "Humidity",
       value: formatNumber(
-        sensorData?.humidity,
+        displayedSensors?.humidity,
         1
       ),
       unit: "%",
-      note: "Weather reading",
+      note: operational?.sensor_sources?.humidity ?? "Weather reading",
     },
 
     {
       label: "Wind Speed",
       value: formatNumber(
-        sensorData?.wind_speed,
+        displayedSensors?.wind_speed,
         1
       ),
       unit: "",
-      note: "Weather reading",
+      note: operational?.sensor_sources?.wind_speed ?? "Weather reading",
     },
   ];
 
@@ -550,7 +578,6 @@ function App() {
       ? riskHistory[riskHistory.length - 1]
       : null;
 
-  const externalSources = externalData?.sources ?? {};
   const sourceCards = [
     { key: "weather", label: "OpenWeather", icon: CloudRain, value: externalSources.weather?.data?.description ?? "Weather intelligence", detail: `${formatNumber(externalSources.weather?.data?.rainfall_1h, 1)} mm rain · ${formatNumber(externalSources.weather?.data?.humidity, 0)}% humidity` },
     { key: "earthquakes", label: "USGS Earthquakes", icon: Activity, value: `${externalSources.earthquakes?.data?.count ?? 0} recent events`, detail: `${externalSources.earthquakes?.data?.radius_km ?? 250} km monitoring radius` },
@@ -1023,7 +1050,7 @@ function App() {
 
               </div>
 
-              <DisasterMap />
+              <DisasterMap externalData={externalData} riskScore={fusedRiskScore} />
 
             </div>
 
@@ -1047,7 +1074,7 @@ function App() {
               <div className="alerts-list">
 
                 {alertList.length > 0 ? (
-                  alertList.map(
+                  alertList.slice(0, 4).map(
                     (alert, index) => (
                       <div
                         className="alert-item"
