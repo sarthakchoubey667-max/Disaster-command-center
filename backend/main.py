@@ -1981,6 +1981,7 @@ app.add_middleware(
     "http://127.0.0.1:5173",
     "https://disaster-command-center-4vul.onrender.com",
     "https://disaster-command-center-1.onrender.com",
+    "https://disaster-command-center-lglo.onrender.com",
     ],
 
     allow_credentials=True,
