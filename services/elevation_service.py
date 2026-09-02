@@ -26,7 +26,7 @@ def get_elevation(latitude: float, longitude: float) -> dict:
         )
         response.raise_for_status()
         payload = response.json()
-        elevation = payload.get("elevation")
+        elevation = payload.get("Elevation", payload.get("elevation"))
         if elevation is None and isinstance(payload.get("data"), dict):
             elevation = payload["data"].get("elevation")
         if elevation is None:
