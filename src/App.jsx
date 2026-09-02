@@ -578,6 +578,15 @@ function App() {
       ? riskHistory[riskHistory.length - 1]
       : null;
 
+  const satelliteScenes = externalSources.satellite?.data?.scenes ?? [];
+  const latestSatelliteScene = [...satelliteScenes]
+    .filter((scene) => scene?.acquired)
+    .sort((a, b) => new Date(b.acquired) - new Date(a.acquired))[0] ?? satelliteScenes[0];
+  const satelliteCollection =
+    externalSources.satellite?.data?.collection ??
+    latestSatelliteScene?.item_type ??
+    "Waiting for coverage";
+
   const sourceCards = [
     { key: "weather", label: "OpenWeather", icon: CloudRain, value: externalSources.weather?.data?.description ?? "Weather intelligence", detail: `${formatNumber(externalSources.weather?.data?.rainfall_1h, 1)} mm rain · ${formatNumber(externalSources.weather?.data?.humidity, 0)}% humidity` },
     { key: "earthquakes", label: "USGS Earthquakes", icon: Activity, value: `${externalSources.earthquakes?.data?.count ?? 0} recent events`, detail: `${externalSources.earthquakes?.data?.radius_km ?? 250} km monitoring radius` },
@@ -585,7 +594,7 @@ function App() {
     { key: "geocoding", label: "Google Geocoding", icon: MapPin, value: externalSources.geocoding?.data?.results?.[0]?.formatted_address ?? "Location resolver", detail: "Coordinate and address context" },
     { key: "alerts", label: "NDMA SACHET", icon: ShieldAlert, value: `${externalSources.alerts?.data?.count ?? 0} official alerts`, detail: "All-India government warning feed" },
     { key: "river", label: "NWDP / NWIC", icon: Waves, value: externalSources.river?.data?.water_level != null ? `${formatNumber(externalSources.river.data.water_level, 2)} m water level` : "River intelligence", detail: "Government water-data network" },
-    { key: "satellite", label: "Planet Satellite", icon: Satellite, value: `${externalSources.satellite?.data?.count ?? 0} scenes`, detail: "Remote-sensing coverage" },
+    { key: "satellite", label: "Planet Satellite", icon: Satellite, value: `${externalSources.satellite?.data?.count ?? 0} scenes`, detail: latestSatelliteScene?.acquired ? `Latest: ${formatTimestamp(latestSatelliteScene.acquired)}` : "Remote-sensing coverage" },
   ];
 
   /*
@@ -1433,6 +1442,28 @@ function App() {
                   </article>
                 );
               })}
+            </div>
+
+            <div className={`satellite-insight ${externalSources.satellite?.status === "success" ? "live" : "fallback"}`}>
+              <div className="satellite-insight-title">
+                <Satellite size={21} />
+                <div>
+                  <span>Satellite observation</span>
+                  <strong>{satelliteCollection}</strong>
+                </div>
+              </div>
+              <div>
+                <span>Available scenes</span>
+                <strong>{externalSources.satellite?.data?.count ?? 0}</strong>
+              </div>
+              <div>
+                <span>Latest capture</span>
+                <strong>{latestSatelliteScene?.acquired ? formatTimestamp(latestSatelliteScene.acquired) : "Not available"}</strong>
+              </div>
+              <div>
+                <span>Cloud cover</span>
+                <strong>{latestSatelliteScene?.cloud_cover != null ? `${formatNumber(latestSatelliteScene.cloud_cover, 1)}%` : "Not reported"}</strong>
+              </div>
             </div>
 
             <div className="fusion-strip">
