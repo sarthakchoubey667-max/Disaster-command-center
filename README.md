@@ -41,7 +41,7 @@ Backend build: `pip install -r backend/requirements.txt`
 
 Backend start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
 
-Set backend variables: `OPENWEATHER_API_KEY`, `OPENTOPOGRAPHY_API_KEY`, `GOOGLE_MAPS_API_KEY`, `PLANET_API_KEY`, `NWIC_API_URL`, optional `NWIC_API_TOKEN`, and verified official `SACHET_FEED_URL`. Optional URL overrides are listed in `.env.example`. USGS requires no key. NWDP/NWIC may need access approval. Planet imagery access depends on the account plan.
+Set backend variables: `OPENWEATHER_API_KEY`, `OPENTOPOGRAPHY_API_KEY`, `GOOGLE_MAPS_API_KEY`, `PLANET_CLIENT_ID`, `PLANET_CLIENT_SECRET`, `NWIC_API_URL`, optional `NWIC_API_TOKEN`, and verified official `SACHET_FEED_URL`. Optional URL overrides are listed in `.env.example`. USGS requires no key. NWDP/NWIC may need access approval. Planet OAuth uses the Catalog API and defaults to public Sentinel-2 L2A metadata; the legacy `PLANET_API_KEY` path remains available for compatible paid accounts.
 
 Frontend build: `npm install && npm run build`; publish `dist`; set `VITE_API_BASE_URL=https://YOUR-BACKEND.onrender.com`.
 
