@@ -593,7 +593,7 @@ function App() {
     { key: "elevation", label: "OpenTopography", icon: Mountain, value: `${formatNumber(externalSources.elevation?.data?.elevation_m, 0)} m elevation`, detail: externalSources.elevation?.data?.dem_type ?? "Terrain / DEM intelligence" },
     { key: "geocoding", label: "Google Geocoding", icon: MapPin, value: externalSources.geocoding?.data?.results?.[0]?.formatted_address ?? "Location resolver", detail: "Coordinate and address context" },
     { key: "alerts", label: "NDMA SACHET", icon: ShieldAlert, value: `${externalSources.alerts?.data?.count ?? 0} official alerts`, detail: "All-India government warning feed" },
-    { key: "river", label: "NWDP / NWIC", icon: Waves, value: externalSources.river?.data?.water_level != null ? `${formatNumber(externalSources.river.data.water_level, 2)} m water level` : "River intelligence", detail: "Government water-data network" },
+    { key: "river", label: "NWDP / NWIC", icon: Waves, value: externalSources.river?.data?.water_level != null ? `${formatNumber(externalSources.river.data.water_level, 2)} m water level` : "River intelligence", detail: externalSources.river?.data?.nearest_station ? `${externalSources.river.data.nearest_station}${externalSources.river.data.river ? ` · ${externalSources.river.data.river}` : ""}` : "Government water-data network" },
     { key: "satellite", label: "Planet Satellite", icon: Satellite, value: `${externalSources.satellite?.data?.count ?? 0} scenes`, detail: latestSatelliteScene?.acquired ? `Latest: ${formatTimestamp(latestSatelliteScene.acquired)}` : "Remote-sensing coverage" },
   ];
 
@@ -1470,7 +1470,7 @@ function App() {
               <div><span>Fusion location</span><strong>{externalData?.location ? `${formatNumber(externalData.location.latitude, 4)}, ${formatNumber(externalData.location.longitude, 4)}` : "Waiting for coordinates"}</strong></div>
               <div><span>Landslide rainfall input</span><strong>{formatNumber(externalData?.landslide_features?.rainfall_mm, 1)} mm</strong></div>
               <div><span>Official alerts</span><strong>{externalData?.landslide_features?.official_alert_count ?? 0}</strong></div>
-              <div><span>Recent earthquakes</span><strong>{externalData?.landslide_features?.recent_earthquake_count ?? 0}</strong></div>
+              <div><span>River water-level input</span><strong>{externalData?.landslide_features?.water_level != null ? `${formatNumber(externalData.landslide_features.water_level, 2)} m` : "Waiting"}</strong></div>
             </div>
           </section>
 
