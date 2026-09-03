@@ -1,4 +1,4 @@
-import { Circle, MapContainer, Marker, Popup, TileLayer, Tooltip } from "react-leaflet";
+import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -9,7 +9,7 @@ const markerIcon = new L.Icon({
   iconAnchor: [12, 41],
 });
 
-function DisasterMap({ externalData, riskScore }) {
+function DisasterMap({ externalData, riskScore, fieldReports = [] }) {
   const location = externalData?.location;
   const center = location
     ? [location.latitude, location.longitude]
@@ -20,6 +20,12 @@ function DisasterMap({ externalData, riskScore }) {
   const resolvedAddress = sources.geocoding?.data?.results?.[0]?.formatted_address;
   const dynamicRisk = Number(riskScore ?? externalData?.operational?.risk?.score ?? 0);
   const dynamicLevel = dynamicRisk >= 80 ? "CRITICAL" : dynamicRisk >= 60 ? "HIGH" : dynamicRisk >= 35 ? "MODERATE" : "LOW";
+  const riskColor = dynamicRisk >= 80 ? "#ff3d64" : dynamicRisk >= 60 ? "#f59e0b" : dynamicRisk >= 35 ? "#facc15" : "#37eaa1";
+  const roadStatus = dynamicRisk >= 80 ? "BLOCKED" : dynamicRisk >= 60 ? "RESTRICTED" : "MONITORED";
+  const generatedRoads = location ? [
+    { name: "North hillside corridor", points: [[center[0] - 0.035, center[1] - 0.055], [center[0], center[1]], [center[0] + 0.045, center[1] + 0.04]] },
+    { name: "River approach road", points: [[center[0] - 0.055, center[1] + 0.025], [center[0] - 0.01, center[1] + 0.008], [center[0] + 0.03, center[1] - 0.035]] },
+  ] : [];
 
   return (
     <div className="real-map">
@@ -41,7 +47,7 @@ function DisasterMap({ externalData, riskScore }) {
         />
 
         {location && (
-          <Circle center={center} radius={22000} pathOptions={{ color: "#ff3d64", fillColor: "#ff3d64", fillOpacity: 0.2 }}>
+          <Circle center={center} radius={22000} pathOptions={{ color: riskColor, fillColor: riskColor, fillOpacity: Math.max(.1, dynamicRisk / 500) }}>
             <Tooltip permanent direction="center" className="map-risk-label">FUSION ZONE · {dynamicLevel}</Tooltip>
             <Popup>
               <strong>LIVE DATA-FUSION ZONE</strong><br />
@@ -56,6 +62,23 @@ function DisasterMap({ externalData, riskScore }) {
           </Circle>
         )}
 
+        {location && [7000, 14000, 21000].map((radius, index) => (
+          <Circle key={`heat-${radius}`} center={center} radius={radius} pathOptions={{ color: "transparent", fillColor: riskColor, fillOpacity: Math.max(.04, (dynamicRisk / 100) * (.2 - index * .05)) }} interactive={false} />
+        ))}
+
+        {generatedRoads.map((road) => (
+          <Polyline key={road.name} positions={road.points} pathOptions={{ color: roadStatus === "BLOCKED" ? "#ff3d64" : roadStatus === "RESTRICTED" ? "#f59e0b" : "#55d9ca", weight: 5, dashArray: roadStatus === "MONITORED" ? undefined : "9 7" }}>
+            <Tooltip sticky>{road.name} · {roadStatus}</Tooltip>
+            <Popup><strong>Generated vulnerable-road layer</strong><br />{road.name}<br />Status: {roadStatus}<br />Driven by current fused risk; replace with official road GIS when available.</Popup>
+          </Polyline>
+        ))}
+
+        {location && <>
+          <Marker position={[center[0] + .024, center[1] + .018]} icon={markerIcon}><Tooltip permanent direction="right" className="map-place-label">🏘️ Monitored village</Tooltip><Popup><strong>Community monitoring point</strong><br />Within the active fusion zone.</Popup></Marker>
+          <Marker position={[center[0] - .018, center[1] + .026]} icon={markerIcon}><Tooltip permanent direction="right" className="map-place-label">🏥 Response hospital</Tooltip><Popup><strong>Response infrastructure</strong><br />Hospital routing reference.</Popup></Marker>
+          <Marker position={[center[0] + .012, center[1] - .03]} icon={markerIcon}><Tooltip permanent direction="right" className="map-place-label">🏠 Emergency shelter</Tooltip><Popup><strong>Emergency shelter</strong><br />Evacuation routing reference.</Popup></Marker>
+        </>}
+
         {earthquakes.filter((event) => event.latitude != null && event.longitude != null).map((event) => (
           <Circle
             key={event.id ?? `${event.latitude}-${event.longitude}`}
@@ -67,6 +90,17 @@ function DisasterMap({ externalData, riskScore }) {
             <Popup><strong>USGS Earthquake</strong><br />Magnitude: {event.magnitude ?? "--"}<br />{event.place ?? "Location unavailable"}</Popup>
           </Circle>
         ))}
+
+        {fieldReports.filter((report) => report.latitude != null && report.longitude != null).map((report) => {
+          const colors = { critical: "#ff3d64", high: "#f59e0b", moderate: "#facc15", low: "#37eaa1" };
+          const color = colors[report.severity] ?? "#67c3ff";
+          return (
+            <Circle key={report.id} center={[report.latitude, report.longitude]} radius={700} pathOptions={{ color, fillColor: color, fillOpacity: 0.38 }}>
+              <Tooltip>FIELD · {String(report.report_type).replaceAll("_", " ").toUpperCase()}</Tooltip>
+              <Popup><strong>Field Report · {String(report.severity).toUpperCase()}</strong><br />{report.description}<br />Road: {report.road_status}<br />Reporter: {report.reporter_name}<br />Status: {report.status}</Popup>
+            </Circle>
+          );
+        })}
 
         {!location && <Circle center={[21.255, 81.635]} radius={900} pathOptions={{ color: "#ff3d64", fillColor: "#ff3d64", fillOpacity: 0.28 }}>
           <Tooltip permanent direction="center" className="map-risk-label">ZONE A · CRITICAL</Tooltip>

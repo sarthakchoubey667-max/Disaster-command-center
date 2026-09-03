@@ -12,6 +12,7 @@ FastAPI + React command center with the existing five-second controlled sensor s
 - NWDP/NWIC water data: `/api/external/river`
 - Planet satellite scene search: `/api/external/satellite`
 - Unified landslide input: `/api/data-fusion`
+- Geo-tagged field reports: `GET/POST /api/field-reports`
 
 Adapters return consistent `status`, `source`, `timestamp`, and `data` fields. Missing credentials/provider failures return `status: "fallback"` without stopping FastAPI or the simulation. Fusion calls sources concurrently and returns normalized `landslide_features` plus availability details.
 
@@ -26,6 +27,8 @@ npm run dev
 ```
 
 The dashboard still polls `/api/dashboard` every five seconds. External fusion loads once per page load to avoid unnecessary provider usage.
+
+Field officers can submit geo-tagged crack, slope movement, landslide, flooding, and blocked-road reports with an optional photo/video. Reports are stored in SQLite and displayed on the GIS map. The frontend is installable as a PWA; text/coordinate reports submitted without a network connection are queued on the device and synchronized when connectivity returns.
 
 ## Verification
 
@@ -46,5 +49,7 @@ Set backend variables: `OPENWEATHER_API_KEY`, `OPENTOPOGRAPHY_API_KEY`, `GOOGLE_
 When OpenTopography is unavailable or rate-limited, elevation falls back to the Open-Meteo Elevation API (Copernicus DEM GLO-90) with attribution. When Google Geocoding is not configured, reverse geocoding falls back to the public OpenStreetMap Nominatim service with a project User-Agent, a one-request-per-second limit, 24-hour caching, and visible OpenStreetMap attribution. Review provider terms before commercial or high-traffic deployment.
 
 Frontend build: `npm install && npm run build`; publish `dist`; set `VITE_API_BASE_URL=https://YOUR-BACKEND.onrender.com`.
+
+For durable field reports and media on Render, attach a persistent disk and set `DISASTER_DATA_DIR` to its mount path (for example `/var/data/disaster-ai`). Without a persistent disk, SQLite records and uploaded media can be lost when the service restarts or redeploys. `MAX_REPORT_UPLOAD_MB` defaults to `10`.
 
 Keep provider keys backend-only. Never put secrets in `VITE_*` variables because Vite embeds them in browser assets.

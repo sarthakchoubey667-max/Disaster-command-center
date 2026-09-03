@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import "./App.css";
 import DisasterMap from "./DisasterMap";
+import FieldReports from "./FieldReports";
 import SensorChart from "./SensorChart";
 
 const API_BASE_URL =
@@ -74,6 +75,7 @@ function App() {
   const [riskTrend, setRiskTrend] = useState(null);
   const [riskHistory, setRiskHistory] = useState([]);
   const [externalData, setExternalData] = useState(null);
+  const [fieldReports, setFieldReports] = useState([]);
 
   /*
    * ------------------------------------------------------------
@@ -1069,7 +1071,7 @@ function App() {
 
               </div>
 
-              <DisasterMap externalData={externalData} riskScore={fusedRiskScore} />
+              <DisasterMap externalData={externalData} riskScore={fusedRiskScore} fieldReports={fieldReports} />
 
             </div>
 
@@ -1513,6 +1515,8 @@ function App() {
               <div><span>River water-level input</span><strong>{externalData?.landslide_features?.water_level != null ? `${formatNumber(externalData.landslide_features.water_level, 2)} m` : "Waiting"}</strong></div>
             </div>
           </section>
+
+          <FieldReports apiBaseUrl={API_BASE_URL} onReportsChange={setFieldReports} />
 
           {/* FOOTER */}
 

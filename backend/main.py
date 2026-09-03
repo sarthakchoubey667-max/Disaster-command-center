@@ -9,8 +9,9 @@ from threading import RLock
 from typing import Iterator, Mapping, Optional
 
 import joblib
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -25,6 +26,13 @@ from services.river_service import get_river_data
 from services.sachet_service import get_sachet_alerts
 from services.satellite_service import get_satellite_scenes
 from services.weather_service import get_weather_data
+from services.field_report_service import (
+    UPLOAD_DIR,
+    create_report,
+    initialize_report_store,
+    list_reports,
+    save_media,
+)
 from services.sensor_service import (
     get_latest_sensor_data,
     get_sensor_history,
@@ -1928,6 +1936,8 @@ async def lifespan(app: FastAPI):
 
     global background_task
 
+    initialize_report_store()
+
     background_task = asyncio.create_task(
         background_ai_loop()
     )
@@ -1967,6 +1977,8 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
 # ============================================================
@@ -2198,6 +2210,49 @@ def external_data_fusion(lat: float = 26.1445, lon: float = 91.7362):
     with state_lock:
         fallback = latest_sensor_data.copy()
     return get_fused_external_data(lat, lon, fallback)
+
+
+# ============================================================
+# GEO-TAGGED FIELD REPORTING
+# ============================================================
+
+@app.get("/api/field-reports")
+def field_reports(limit: int = 100):
+    reports = list_reports(limit)
+    return {"status": "success", "count": len(reports), "reports": reports}
+
+
+@app.post("/api/field-reports", status_code=201)
+async def submit_field_report(
+    report_type: str = Form(...),
+    severity: str = Form(...),
+    description: str = Form(..., min_length=3, max_length=1000),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    reporter_name: str | None = Form(None, max_length=100),
+    road_status: str = Form("unknown", max_length=40),
+    media: UploadFile | None = File(None),
+):
+    media_url = None
+    media_type = None
+    try:
+        if media is not None and media.filename:
+            content = await media.read()
+            media_url, media_type = save_media(content, media.content_type)
+        report = create_report(
+            report_type=report_type,
+            severity=severity,
+            description=description,
+            latitude=latitude,
+            longitude=longitude,
+            reporter_name=reporter_name,
+            road_status=road_status,
+            media_url=media_url,
+            media_type=media_type,
+        )
+        return {"status": "created", "report": report}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ============================================================
