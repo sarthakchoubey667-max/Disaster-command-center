@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import DisasterMap from "./DisasterMap";
 import FieldReports from "./FieldReports";
+import WarningCenter from "./WarningCenter";
 import SensorChart from "./SensorChart";
 
 const API_BASE_URL =
@@ -1517,6 +1518,8 @@ function App() {
           </section>
 
           <FieldReports apiBaseUrl={API_BASE_URL} onReportsChange={setFieldReports} />
+
+          <WarningCenter externalData={externalData} riskScore={fusedRiskScore} />
 
           {/* FOOTER */}
 
