@@ -7,6 +7,8 @@ from services.river_service import get_river_data
 from services.sachet_service import get_sachet_alerts
 from services.satellite_service import get_satellite_scenes
 from services.weather_service import get_weather_data
+from services.field_report_service import list_reports
+from services.landslide_model_service import predict_landslide_risk
 
 
 def get_fused_external_data(latitude, longitude, sensor_fallback=None):
@@ -25,6 +27,7 @@ def get_fused_external_data(latitude, longitude, sensor_fallback=None):
         sources = {name: future.result() for name, future in futures.items()}
     available = [name for name, value in sources.items() if value.get("status") == "success"]
     features = _landslide_features(sources, sensors)
+    features["field_report_count"] = len(list_reports(100))
     return {
         "status": "success" if available else "fallback",
         "location": {"latitude": latitude, "longitude": longitude},
@@ -95,14 +98,7 @@ def _operational_snapshot(sources, sensors, features):
                 sensor_values[key] = river[key]
                 sensor_sources[key] = "NWDP/NWIC"
 
-    rain_score = min(_number(features.get("rainfall_mm")) / 2.0, 35)
-    water_score = min(_number(features.get("water_level")) * 8, 25)
-    humidity_score = max(0, min((_number(features.get("humidity_percent")) - 60) * 0.5, 15))
-    quake_score = min(_number(features.get("max_recent_magnitude")) * 4, 15)
-    # The SACHET feed is nationwide, so alerts are intentionally a small signal
-    # until a provider supplies reliable geo-targeting for the selected zone.
-    alert_score = min(_number(features.get("official_alert_count")) * 0.25, 5)
-    external_score = round(min(rain_score + water_score + humidity_score + quake_score + alert_score, 100), 2)
+    landslide_risk = predict_landslide_risk(features)
 
     official_alerts = (sources["alerts"].get("data") or {}).get("alerts", [])
     earthquakes = (sources["earthquakes"].get("data") or {}).get("events", [])
@@ -111,16 +107,6 @@ def _operational_snapshot(sources, sensors, features):
         "sensor_sources": sensor_sources,
         "alerts": official_alerts,
         "earthquakes": earthquakes,
-        "risk": {
-            "score": external_score,
-            "level": _risk_level(external_score),
-            "factors": {
-                "rainfall": round(rain_score, 2),
-                "water_level": round(water_score, 2),
-                "humidity": round(humidity_score, 2),
-                "earthquakes": round(quake_score, 2),
-                "official_alerts": round(alert_score, 2),
-            },
-        },
+        "risk": landslide_risk,
         "data_mode": "hybrid" if weather_live or river_live else "controlled_simulation",
     }

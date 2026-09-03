@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,7 @@ from services.field_report_service import (
     list_reports,
     save_media,
 )
+from services.notification_service import maybe_dispatch_sms, notification_status
 from services.sensor_service import (
     get_latest_sensor_data,
     get_sensor_history,
@@ -115,6 +117,7 @@ latest_sensor_data: dict = {
 
 
 background_task: Optional[asyncio.Task] = None
+notification_task: Optional[asyncio.Task] = None
 
 
 # ============================================================
@@ -1927,6 +1930,23 @@ async def background_ai_loop():
             )
 
 
+async def background_notification_loop():
+    """Optional SMS monitor; completely dormant unless explicitly enabled."""
+    while True:
+        try:
+            await asyncio.sleep(int(os.getenv("ALERT_MONITOR_INTERVAL_SECONDS", "900")))
+            if not notification_status()["enabled"]:
+                continue
+            with state_lock:
+                fallback = latest_sensor_data.copy()
+            fused = await asyncio.to_thread(get_fused_external_data, 26.1445, 91.7362, fallback)
+            await asyncio.to_thread(maybe_dispatch_sms, fused["operational"]["risk"], "North Eastern Region monitoring zone")
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Automated notification monitor failed.")
+
+
 # ============================================================
 # FASTAPI LIFESPAN
 # ============================================================
@@ -1934,13 +1954,14 @@ async def background_ai_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    global background_task
+    global background_task, notification_task
 
     initialize_report_store()
 
     background_task = asyncio.create_task(
         background_ai_loop()
     )
+    notification_task = asyncio.create_task(background_notification_loop())
 
     logger.info(
         "DisasterAI API started."
@@ -1955,6 +1976,13 @@ async def lifespan(app: FastAPI):
         try:
             await background_task
 
+        except asyncio.CancelledError:
+            pass
+
+    if notification_task is not None:
+        notification_task.cancel()
+        try:
+            await notification_task
         except asyncio.CancelledError:
             pass
 
@@ -2210,6 +2238,19 @@ def external_data_fusion(lat: float = 26.1445, lon: float = 91.7362):
     with state_lock:
         fallback = latest_sensor_data.copy()
     return get_fused_external_data(lat, lon, fallback)
+
+
+@app.get("/api/landslide/risk")
+def landslide_risk(lat: float = 26.1445, lon: float = 91.7362):
+    with state_lock:
+        fallback = latest_sensor_data.copy()
+    fused = get_fused_external_data(lat, lon, fallback)
+    return {"status": "success", "risk": fused["operational"]["risk"], "features": fused["landslide_features"]}
+
+
+@app.get("/api/notifications/status")
+def alert_delivery_status():
+    return notification_status()
 
 
 # ============================================================

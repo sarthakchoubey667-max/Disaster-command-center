@@ -13,6 +13,8 @@ FastAPI + React command center with the existing five-second controlled sensor s
 - Planet satellite scene search: `/api/external/satellite`
 - Unified landslide input: `/api/data-fusion`
 - Geo-tagged field reports: `GET/POST /api/field-reports`
+- Landslide-specific risk: `/api/landslide/risk`
+- Alert-delivery readiness: `/api/notifications/status`
 
 Adapters return consistent `status`, `source`, `timestamp`, and `data` fields. Missing credentials/provider failures return `status: "fallback"` without stopping FastAPI or the simulation. Fusion calls sources concurrently and returns normalized `landslide_features` plus availability details.
 
@@ -51,5 +53,19 @@ When OpenTopography is unavailable or rate-limited, elevation falls back to the 
 Frontend build: `npm install && npm run build`; publish `dist`; set `VITE_API_BASE_URL=https://YOUR-BACKEND.onrender.com`.
 
 For durable field reports and media on Render, attach a persistent disk and set `DISASTER_DATA_DIR` to its mount path (for example `/var/data/disaster-ai`). Without a persistent disk, SQLite records and uploaded media can be lost when the service restarts or redeploys. `MAX_REPORT_UPLOAD_MB` defaults to `10`.
+
+## Landslide model
+
+The fusion endpoint now uses a landslide-specific predictor. It loads `LANDSLIDE_MODEL_PATH` when a trained model is present and otherwise returns a clearly labelled `transparent_heuristic_fallback`. Train only from verified historical records matching `ml/landslide_training_template.csv`:
+
+```powershell
+python ml/train_landslide_model.py path/to/verified-landslides.csv
+```
+
+The target column is `landslide_event` (`0` or `1`). Do not describe the heuristic fallback as a trained ML model.
+
+## Automated warning delivery
+
+In-app multilingual warnings and opt-in browser notifications work without credentials. Automated SMS is disabled by default. To enable it, set `ALERT_DELIVERY_ENABLED=true`, comma-separated `ALERT_RECIPIENTS`, and `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`. The backend checks every `ALERT_MONITOR_INTERVAL_SECONDS`, sends only above `ALERT_RISK_THRESHOLD`, and applies `ALERT_COOLDOWN_SECONDS` to prevent repeated messages. Protect recipient consent and comply with telecom rules before enabling delivery.
 
 Keep provider keys backend-only. Never put secrets in `VITE_*` variables because Vite embeds them in browser assets.
