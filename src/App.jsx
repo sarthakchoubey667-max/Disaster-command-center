@@ -597,6 +597,16 @@ function App() {
     { key: "satellite", label: "Planet Satellite", icon: Satellite, value: `${externalSources.satellite?.data?.count ?? 0} scenes`, detail: latestSatelliteScene?.acquired ? `Latest: ${formatTimestamp(latestSatelliteScene.acquired)}` : "Remote-sensing coverage" },
   ];
 
+  const operationalUses = [
+    { key: "weather", target: "Sensor panel + risk engine", use: "Rainfall, humidity, temperature and wind replace simulated readings." },
+    { key: "earthquakes", target: "Disaster map + seismic risk", use: "Nearby events appear on the map and magnitude contributes to risk." },
+    { key: "elevation", target: "Terrain context", use: "DEM elevation is attached to the monitored landslide zone." },
+    { key: "geocoding", target: "Map location resolver", use: "Fusion coordinates are converted into a readable place address." },
+    { key: "alerts", target: "Active Alerts + risk engine", use: "Official warnings populate the alerts panel and alert factor." },
+    { key: "river", target: "Sensor panel + water risk", use: "Nearest-station level replaces simulation and contributes to risk." },
+    { key: "satellite", target: "Remote observation coverage", use: "Scene count, capture freshness and cloud cover confirm visibility." },
+  ].map((usage) => ({ ...usage, source: sourceCards.find((source) => source.key === usage.key) }));
+
   /*
    * ------------------------------------------------------------
    * RENDER
@@ -1463,6 +1473,36 @@ function App() {
               <div>
                 <span>Cloud cover</span>
                 <strong>{latestSatelliteScene?.cloud_cover != null ? `${formatNumber(latestSatelliteScene.cloud_cover, 1)}%` : "Not reported"}</strong>
+              </div>
+            </div>
+
+            <div className="operational-usage">
+              <div className="operational-usage-heading">
+                <div>
+                  <span>Operational data usage</span>
+                  <strong>Every connected service has an active job</strong>
+                </div>
+                <small>LIVE INPUT → APP MODULE</small>
+              </div>
+              <div className="operational-usage-grid">
+                {operationalUses.map(({ key, target, use, source }) => {
+                  const Icon = source.icon;
+                  const isLive = externalSources[key]?.status === "success";
+                  return (
+                    <article className="usage-row" key={key}>
+                      <div className={`usage-status ${isLive ? "live" : "fallback"}`}><Icon size={16} /></div>
+                      <div className="usage-source">
+                        <strong>{source.label}</strong>
+                        <span>{source.value}</span>
+                      </div>
+                      <div className="usage-arrow">→</div>
+                      <div className="usage-target">
+                        <strong>{target}</strong>
+                        <span>{use}</span>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </div>
 

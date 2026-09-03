@@ -15,6 +15,9 @@ function DisasterMap({ externalData, riskScore }) {
     ? [location.latitude, location.longitude]
     : [21.2514, 81.6296];
   const earthquakes = externalData?.operational?.earthquakes ?? [];
+  const features = externalData?.landslide_features ?? {};
+  const sources = externalData?.sources ?? {};
+  const resolvedAddress = sources.geocoding?.data?.results?.[0]?.formatted_address;
   const dynamicRisk = Number(riskScore ?? externalData?.operational?.risk?.score ?? 0);
   const dynamicLevel = dynamicRisk >= 80 ? "CRITICAL" : dynamicRisk >= 60 ? "HIGH" : dynamicRisk >= 35 ? "MODERATE" : "LOW";
 
@@ -40,7 +43,16 @@ function DisasterMap({ externalData, riskScore }) {
         {location && (
           <Circle center={center} radius={22000} pathOptions={{ color: "#ff3d64", fillColor: "#ff3d64", fillOpacity: 0.2 }}>
             <Tooltip permanent direction="center" className="map-risk-label">FUSION ZONE · {dynamicLevel}</Tooltip>
-            <Popup><strong>LIVE DATA-FUSION ZONE</strong><br />Landslide risk: {dynamicRisk.toFixed(1)}/100<br />OpenWeather, USGS, SACHET and connected providers</Popup>
+            <Popup>
+              <strong>LIVE DATA-FUSION ZONE</strong><br />
+              {resolvedAddress ?? `${center[0].toFixed(4)}, ${center[1].toFixed(4)}`}<br />
+              Landslide risk: {dynamicRisk.toFixed(1)}/100<br />
+              Rainfall: {Number(features.rainfall_mm ?? 0).toFixed(1)} mm<br />
+              River level: {features.water_level != null ? `${Number(features.water_level).toFixed(2)} m` : "Unavailable"}<br />
+              Elevation: {features.terrain?.elevation_m != null ? `${Number(features.terrain.elevation_m).toFixed(0)} m` : "Unavailable"}<br />
+              Official alerts: {features.official_alert_count ?? 0}<br />
+              Satellite scenes: {features.satellite_scene_count ?? 0}
+            </Popup>
           </Circle>
         )}
 
