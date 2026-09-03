@@ -33,6 +33,29 @@ def _store(latitude: float, longitude: float, value: dict, ttl_seconds: float):
     return value
 
 
+def _open_meteo_elevation(latitude: float, longitude: float) -> dict:
+    response = requests.get(
+        os.getenv("OPEN_METEO_ELEVATION_URL", "https://api.open-meteo.com/v1/elevation"),
+        timeout=DEFAULT_TIMEOUT,
+        params={"latitude": latitude, "longitude": longitude},
+    )
+    response.raise_for_status()
+    elevations = response.json().get("elevation") or []
+    if not elevations:
+        raise ValueError("Open-Meteo response did not contain elevation")
+    return _store(latitude, longitude, result(
+        "Open-Meteo Elevation",
+        data={
+            "elevation_m": round(float(elevations[0]), 2),
+            "sample_count": 1,
+            "dem_type": "Copernicus DEM GLO-90",
+            "method": "open_meteo_fallback",
+            "attribution": "Copernicus DEM via Open-Meteo",
+        },
+        message="OpenTopography fallback",
+    ), float(os.getenv("OPENTOPOGRAPHY_CACHE_SECONDS", "43200")))
+
+
 def get_elevation(latitude: float, longitude: float) -> dict:
     cached = _cached(latitude, longitude)
     if cached is not None:
@@ -40,7 +63,10 @@ def get_elevation(latitude: float, longitude: float) -> dict:
 
     key = os.getenv("OPENTOPOGRAPHY_API_KEY")
     if not key:
-        return unavailable("OpenTopography", "OPENTOPOGRAPHY_API_KEY is not configured", {"elevation_m": None})
+        try:
+            return _open_meteo_elevation(latitude, longitude)
+        except Exception:
+            return unavailable("Elevation", "Elevation providers are currently unavailable", {"elevation_m": None})
     dataset = os.getenv("OPENTOPOGRAPHY_POINT_DATASET", "COP30")
     point_url = os.getenv(
         "OPENTOPOGRAPHY_POINT_API_URL",
@@ -121,8 +147,11 @@ def get_elevation(latitude: float, longitude: float) -> dict:
                 },
             ), float(os.getenv("OPENTOPOGRAPHY_CACHE_SECONDS", "43200")))
         except Exception:
-            return _store(latitude, longitude, unavailable(
-                "OpenTopography",
-                "Elevation provider is currently unavailable",
-                {"elevation_m": None},
-            ), float(os.getenv("OPENTOPOGRAPHY_FAILURE_CACHE_SECONDS", "1800")))
+            try:
+                return _open_meteo_elevation(latitude, longitude)
+            except Exception:
+                return _store(latitude, longitude, unavailable(
+                    "Elevation",
+                    "Elevation providers are currently unavailable",
+                    {"elevation_m": None},
+                ), float(os.getenv("OPENTOPOGRAPHY_FAILURE_CACHE_SECONDS", "1800")))

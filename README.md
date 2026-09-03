@@ -43,6 +43,8 @@ Backend start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
 
 Set backend variables: `OPENWEATHER_API_KEY`, `OPENTOPOGRAPHY_API_KEY`, `GOOGLE_MAPS_API_KEY`, `PLANET_CLIENT_ID`, `PLANET_CLIENT_SECRET`, optional `NWIC_API_URL`/`NWIC_API_TOKEN`, and verified official `SACHET_FEED_URL`. Optional URL overrides are listed in `.env.example`. USGS requires no key. Without a private NWIC endpoint, the river adapter uses NWIC's official open Assam 2026-2030 hourly telemetry CSV and caches it for 15 minutes. Planet OAuth uses the Catalog API and defaults to public Sentinel-2 L2A metadata; the legacy `PLANET_API_KEY` path remains available for compatible paid accounts.
 
+When OpenTopography is unavailable or rate-limited, elevation falls back to the Open-Meteo Elevation API (Copernicus DEM GLO-90) with attribution. When Google Geocoding is not configured, reverse geocoding falls back to the public OpenStreetMap Nominatim service with a project User-Agent, a one-request-per-second limit, 24-hour caching, and visible OpenStreetMap attribution. Review provider terms before commercial or high-traffic deployment.
+
 Frontend build: `npm install && npm run build`; publish `dist`; set `VITE_API_BASE_URL=https://YOUR-BACKEND.onrender.com`.
 
 Keep provider keys backend-only. Never put secrets in `VITE_*` variables because Vite embeds them in browser assets.
