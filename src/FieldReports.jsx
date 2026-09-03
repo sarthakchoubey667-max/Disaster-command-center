@@ -97,7 +97,7 @@ export default function FieldReports({ apiBaseUrl, onReportsChange }) {
   };
 
   return (
-    <section className="panel field-report-panel" aria-labelledby="field-report-title">
+    <section className="panel field-report-panel" id="cameras" aria-labelledby="field-report-title">
       <div className="panel-header">
         <div><h2 id="field-report-title">Field Reporting</h2><p>Geo-tag cracks, slope movement, landslides and blocked roads</p></div>
         <span className="field-report-count"><Camera size={14} /> {reports.length} reports{queuedCount ? ` · ${queuedCount} queued` : ""}</span>

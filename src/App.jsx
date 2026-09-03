@@ -20,6 +20,7 @@ import "./App.css";
 import DisasterMap from "./DisasterMap";
 import FieldReports from "./FieldReports";
 import WarningCenter from "./WarningCenter";
+import RescueTeams from "./RescueTeams";
 import SensorChart from "./SensorChart";
 
 const API_BASE_URL =
@@ -77,6 +78,15 @@ function App() {
   const [riskHistory, setRiskHistory] = useState([]);
   const [externalData, setExternalData] = useState(null);
   const [fieldReports, setFieldReports] = useState([]);
+  const [activeSection, setActiveSection] = useState("dashboard");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mapExpanded, setMapExpanded] = useState(false);
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
+
+  const openSection = (section) => {
+    setActiveSection(section);
+    setMobileNavOpen(false);
+  };
 
   /*
    * ------------------------------------------------------------
@@ -880,7 +890,7 @@ function App() {
             SIDEBAR
         ====================================================== */}
 
-        <aside className="sidebar">
+        <aside className={`sidebar ${mobileNavOpen ? "open" : ""}`}>
 
           <div className="logo">
             <div className="logo-icon">
@@ -894,32 +904,32 @@ function App() {
           </div>
 
           <nav>
-            <a className="active">
+            <a href="#dashboard" className={activeSection === "dashboard" ? "active" : ""} onClick={() => openSection("dashboard")}>
               <ShieldAlert size={19} />
               Dashboard
             </a>
 
-            <a>
+            <a href="#disaster-map" className={activeSection === "disaster-map" ? "active" : ""} onClick={() => openSection("disaster-map")}>
               <MapPin size={19} />
               Disaster Map
             </a>
 
-            <a>
+            <a href="#sensors" className={activeSection === "sensors" ? "active" : ""} onClick={() => openSection("sensors")}>
               <Radio size={19} />
               Sensors
             </a>
 
-            <a>
+            <a href="#cameras" className={activeSection === "cameras" ? "active" : ""} onClick={() => openSection("cameras")}>
               <Camera size={19} />
               Cameras
             </a>
 
-            <a>
+            <a href="#rescue-teams" className={activeSection === "rescue-teams" ? "active" : ""} onClick={() => openSection("rescue-teams")}>
               <Users size={19} />
               Rescue Teams
             </a>
 
-            <a>
+            <a href="#alerts" className={activeSection === "alerts" ? "active" : ""} onClick={() => openSection("alerts")}>
               <Bell size={19} />
               Alerts
               <span className="nav-badge">
@@ -952,15 +962,17 @@ function App() {
             MAIN CONTENT
         ====================================================== */}
 
-        <main className="main">
+        {mobileNavOpen && <button className="sidebar-backdrop" type="button" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
+
+        <main className="main" id="dashboard">
 
           {/* HEADER */}
 
           <header className="header">
 
-            <div className="mobile-menu">
+            <button type="button" className="mobile-menu" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}>
               <Menu size={23} />
-            </div>
+            </button>
 
             <div>
               <h1>Disaster Command Center</h1>
@@ -982,6 +994,7 @@ function App() {
               <button
                 type="button"
                 className="notification"
+                onClick={() => { openSection("alerts"); document.getElementById("alerts")?.scrollIntoView({ behavior: "smooth" }); }}
               >
                 <Bell size={20} />
                 <span>{alertList.length}</span>
@@ -1052,7 +1065,7 @@ function App() {
 
           <section className="content-grid">
 
-            <div className="panel map-panel">
+            <div className={`panel map-panel ${mapExpanded ? "expanded" : ""}`} id="disaster-map">
 
               <div className="panel-header">
 
@@ -1066,8 +1079,9 @@ function App() {
                 <button
                   type="button"
                   className="map-button"
+                  onClick={() => setMapExpanded((expanded) => !expanded)}
                 >
-                  Full Map
+                  {mapExpanded ? "Close Full Map" : "Full Map"}
                 </button>
 
               </div>
@@ -1076,7 +1090,7 @@ function App() {
 
             </div>
 
-            <div className="panel alerts-panel">
+            <div className="panel alerts-panel" id="alerts">
 
               <div className="panel-header">
 
@@ -1096,7 +1110,7 @@ function App() {
               <div className="alerts-list">
 
                 {alertList.length > 0 ? (
-                  alertList.slice(0, 4).map(
+                  alertList.slice(0, showAllAlerts ? alertList.length : 4).map(
                     (alert, index) => (
                       <div
                         className="alert-item"
@@ -1150,8 +1164,9 @@ function App() {
               <button
                 type="button"
                 className="view-alerts"
+                onClick={() => setShowAllAlerts((show) => !show)}
               >
-                View all alerts
+                {showAllAlerts ? "Show latest alerts" : `View all ${alertList.length} alerts`}
               </button>
 
             </div>
@@ -1166,7 +1181,7 @@ function App() {
 
             {/* SENSOR MONITORING */}
 
-            <div className="panel sensor-panel">
+            <div className="panel sensor-panel" id="sensors">
 
               <div className="panel-header">
 
@@ -1518,6 +1533,8 @@ function App() {
           </section>
 
           <FieldReports apiBaseUrl={API_BASE_URL} onReportsChange={setFieldReports} />
+
+          <RescueTeams />
 
           <WarningCenter externalData={externalData} riskScore={fusedRiskScore} />
 
