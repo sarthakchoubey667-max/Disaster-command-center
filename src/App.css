@@ -1,4 +1,5 @@
 * { box-sizing: border-box; }
+.content-grid { align-items: start; }
 
 :root {
   font-family: Inter, system-ui, sans-serif;
