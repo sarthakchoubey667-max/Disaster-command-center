@@ -72,7 +72,9 @@ Twilio SMS remains optional and disabled when credentials are absent. To use it,
 
 ## Secure multi-role portal
 
-The React entry point now provides verified access for `citizen`, `police`, `fire`, `rescue`, and a private `operator` role. Citizen accounts become active after email verification. Official responder accounts move to `pending_approval` after email verification and must be approved from the Operator Command Center. Operator registration is never exposed publicly.
+The React entry point now provides verified access for `citizen`, `police`, `fire`, `rescue`, `hospital`, and a private `operator` role. Citizen accounts become active after email verification. Official department accounts move to `pending_approval` after email verification and must be approved from the Operator Command Center. Operator registration is never exposed publicly. One email may own separate accounts for different departments; users select the intended department at login. The verification screen also supports correcting an incorrectly entered email and resending the verification code.
+
+Hospital accounts include registration ID/type, address and coordinates, emergency contact, bed/ICU/emergency capacity, ambulances and blood-bank information. Their live dashboard can update beds, ICU, oxygen, ambulances, incoming cases, admitted casualties and shortages. Rescue teams can send vehicle, equipment, road blockage, red/yellow/green triage and destination-hospital updates to the shared operations data layer.
 
 Set `OPERATOR_NAME`, `OPERATOR_EMAIL`, and a strong `OPERATOR_PASSWORD` in the backend Render service. For real email codes, create a Brevo transactional-email API key and set `BREVO_API_KEY`, `AUTH_EMAIL_FROM`, and optionally `AUTH_EMAIL_FROM_NAME`. Keep `AUTH_DEV_SHOW_VERIFICATION_CODE=false` on deployed environments. Authentication data uses the same `DISASTER_DATA_DIR`; attach a persistent Render disk for durable accounts and sessions.
 

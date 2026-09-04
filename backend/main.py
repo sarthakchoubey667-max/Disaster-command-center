@@ -10,6 +10,7 @@ from threading import RLock
 from typing import Iterator, Mapping, Optional
 
 import joblib
+import requests
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -35,7 +36,8 @@ from services.field_report_service import (
     save_media,
 )
 from services.notification_service import maybe_dispatch_alerts, notification_status
-from services.auth_service import decide_user, initialize_auth_store, list_pending_users, login_user, logout_token, register_user, user_from_token, verify_email
+from services.auth_service import change_verification_email, decide_user, initialize_auth_store, list_pending_users, login_user, logout_token, register_user, resend_verification, user_from_token, verify_email
+from services.hospital_service import add_rescue_update, get_hospital_status, initialize_hospital_store, list_rescue_updates, update_hospital_status
 from services.sensor_service import (
     get_latest_sensor_data,
     get_sensor_history,
@@ -218,16 +220,57 @@ class RegistrationData(BaseModel):
 
 class EmailVerificationData(BaseModel):
     email: str
+    role: str
     code: str = Field(min_length=6, max_length=6)
+
+
+class ResendVerificationData(BaseModel):
+    email: str
+    role: str
+
+
+class ChangeVerificationEmailData(BaseModel):
+    old_email: str
+    new_email: str
+    role: str
 
 
 class LoginData(BaseModel):
     email: str
     password: str
+    role: str = ""
 
 
 class ApprovalData(BaseModel):
     approve: bool
+
+
+class HospitalStatusData(BaseModel):
+    beds_total: int = Field(default=50, ge=0)
+    beds_available: int = Field(default=42, ge=0)
+    icu_total: int = Field(default=10, ge=0)
+    icu_available: int = Field(default=8, ge=0)
+    emergency_beds: int = Field(default=6, ge=0)
+    ambulances_available: int = Field(default=3, ge=0)
+    oxygen_units: int = Field(default=24, ge=0)
+    blood_bank_available: bool = True
+    incoming_cases: int = Field(default=0, ge=0)
+    casualties_admitted: int = Field(default=0, ge=0)
+    shortage_note: str = Field(default="", max_length=300)
+
+
+class RescueUpdateData(BaseModel):
+    vehicle_number: str = Field(default="", max_length=60)
+    vehicle_type: str = Field(default="BLS", max_length=60)
+    team_members: list[str] = Field(default_factory=list)
+    equipment_status: str = Field(default="Ready", max_length=150)
+    blockage_status: str = Field(default="Clear", max_length=100)
+    critical_count: int = Field(default=0, ge=0)
+    serious_count: int = Field(default=0, ge=0)
+    minor_count: int = Field(default=0, ge=0)
+    destination_hospital: str = Field(default="Nearest safe hospital", max_length=150)
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 def _bearer_token(authorization: str | None):
@@ -2006,6 +2049,7 @@ async def lifespan(app: FastAPI):
 
     initialize_report_store()
     initialize_auth_store()
+    initialize_hospital_store()
 
     background_task = asyncio.create_task(
         background_ai_loop()
@@ -2165,7 +2209,7 @@ def auth_register(payload: RegistrationData):
 @app.post("/api/auth/verify-email")
 def auth_verify_email(payload: EmailVerificationData):
     try:
-        return verify_email(payload.email, payload.code)
+        return verify_email(payload.email, payload.code, payload.role)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
@@ -2173,13 +2217,33 @@ def auth_verify_email(payload: EmailVerificationData):
 @app.post("/api/auth/login")
 def auth_login(payload: LoginData):
     try:
-        return login_user(payload.email, payload.password)
+        return login_user(payload.email, payload.password, payload.role)
     except PermissionError as error:
         status = str(error)
         message = "Verify your email first" if status == "email_verification" else "Your official account is waiting for operator approval" if status == "pending_approval" else "This account is not active"
         raise HTTPException(status_code=403, detail=message) from error
     except ValueError as error:
         raise HTTPException(status_code=401, detail=str(error)) from error
+
+
+@app.post("/api/auth/resend-code")
+def auth_resend_code(payload: ResendVerificationData):
+    try:
+        return resend_verification(payload.email, payload.role)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except requests.RequestException as error:
+        raise HTTPException(status_code=503, detail="Verification email could not be sent") from error
+
+
+@app.post("/api/auth/change-verification-email")
+def auth_change_verification_email(payload: ChangeVerificationEmailData):
+    try:
+        return change_verification_email(payload.old_email, payload.new_email, payload.role)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except requests.RequestException as error:
+        raise HTTPException(status_code=503, detail="Verification email could not be sent") from error
 
 
 @app.get("/api/auth/me")
@@ -2205,6 +2269,35 @@ def account_decision(user_id: int, payload: ApprovalData, operator: dict = Depen
         return decide_user(user_id, payload.approve)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/api/hospital/status")
+def hospital_status(user: dict = Depends(require_user)):
+    if user["role"] != "hospital":
+        raise HTTPException(status_code=403, detail="Hospital access required")
+    return {"status": "success", "data": get_hospital_status(user["id"])}
+
+
+@app.put("/api/hospital/status")
+def hospital_status_update(payload: HospitalStatusData, user: dict = Depends(require_user)):
+    if user["role"] != "hospital":
+        raise HTTPException(status_code=403, detail="Hospital access required")
+    return {"status": "success", "data": update_hospital_status(user["id"], payload.model_dump())}
+
+
+@app.post("/api/rescue/field-update", status_code=201)
+def rescue_field_update(payload: RescueUpdateData, user: dict = Depends(require_user)):
+    if user["role"] != "rescue":
+        raise HTTPException(status_code=403, detail="Rescue access required")
+    return add_rescue_update(user["id"], payload.model_dump())
+
+
+@app.get("/api/operations/rescue-updates")
+def rescue_updates(limit: int = 25, user: dict = Depends(require_user)):
+    if user["role"] not in {"operator", "hospital", "rescue"}:
+        raise HTTPException(status_code=403, detail="Operations access required")
+    updates = list_rescue_updates(limit)
+    return {"status": "success", "count": len(updates), "updates": updates}
 
 
 # ============================================================

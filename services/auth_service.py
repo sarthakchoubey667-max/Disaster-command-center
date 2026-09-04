@@ -13,7 +13,7 @@ from services.external_base import DEFAULT_TIMEOUT
 
 DATA_DIR = os.getenv("DISASTER_DATA_DIR", "./data")
 DB_PATH = os.path.join(DATA_DIR, "disaster_command.db")
-PUBLIC_ROLES = {"citizen", "police", "fire", "rescue"}
+PUBLIC_ROLES = {"citizen", "police", "fire", "rescue", "hospital"}
 
 
 def _now():
@@ -48,11 +48,16 @@ def _token_hash(value: str):
 
 def initialize_auth_store():
     with _connect() as connection:
+        legacy = connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").fetchone()
+        migrate = bool(legacy and "email TEXT NOT NULL UNIQUE" in (legacy["sql"] or ""))
+        if migrate:
+            connection.execute("DROP TABLE IF EXISTS auth_sessions")
+            connection.execute("ALTER TABLE users RENAME TO users_legacy")
         connection.executescript("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 full_name TEXT NOT NULL,
-                email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                email TEXT NOT NULL COLLATE NOCASE,
                 mobile TEXT,
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL,
@@ -63,7 +68,8 @@ def initialize_auth_store():
                 verification_hash TEXT,
                 verification_expires_at TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                UNIQUE(email, role)
             );
             CREATE TABLE IF NOT EXISTS auth_sessions (
                 token_hash TEXT PRIMARY KEY,
@@ -73,6 +79,10 @@ def initialize_auth_store():
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
         """)
+        if migrate:
+            connection.execute("""INSERT INTO users(id,full_name,email,mobile,password_hash,role,location,official_details,status,email_verified,verification_hash,verification_expires_at,created_at,updated_at)
+                SELECT id,full_name,email,mobile,password_hash,role,location,official_details,status,email_verified,verification_hash,verification_expires_at,created_at,updated_at FROM users_legacy""")
+            connection.execute("DROP TABLE users_legacy")
     _bootstrap_operator()
 
 
@@ -114,7 +124,7 @@ def register_user(payload: dict):
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""", (str(payload.get("full_name", "")).strip(), email, str(payload.get("mobile", "")).strip(), _password_hash(password), role, str(payload.get("location", "")).strip(), json.dumps(payload.get("official_details") or {}), status, 0, _token_hash(code), (now + timedelta(minutes=15)).isoformat(), now.isoformat(), now.isoformat()))
             user_id = cursor.lastrowid
     except sqlite3.IntegrityError as error:
-        raise ValueError("An account with this email already exists") from error
+        raise ValueError("This email already has an account for the selected department") from error
     try:
         delivered = _send_verification_email(email, str(payload.get("full_name", "User")), code)
     except requests.RequestException:
@@ -135,9 +145,9 @@ def _send_verification_email(email: str, name: str, code: str):
     return True
 
 
-def verify_email(email: str, code: str):
+def verify_email(email: str, code: str, role: str):
     with _connect() as connection:
-        row = connection.execute("SELECT * FROM users WHERE email=?", (email.strip().lower(),)).fetchone()
+        row = connection.execute("SELECT * FROM users WHERE email=? AND role=?", (email.strip().lower(), role.strip().lower())).fetchone()
         if not row or not row["verification_hash"] or not hmac.compare_digest(_token_hash(code.strip()), row["verification_hash"]):
             raise ValueError("Invalid verification code")
         if datetime.fromisoformat(row["verification_expires_at"]) < _now():
@@ -147,11 +157,43 @@ def verify_email(email: str, code: str):
     return {"status": "success", "account_status": status}
 
 
-def login_user(email: str, password: str):
+def resend_verification(email: str, role: str):
+    code = f"{secrets.randbelow(1_000_000):06d}"
     with _connect() as connection:
-        row = connection.execute("SELECT * FROM users WHERE email=?", (email.strip().lower(),)).fetchone()
-        if not row or not _password_valid(password, row["password_hash"]):
-            raise ValueError("Incorrect email or password")
+        row = connection.execute("SELECT * FROM users WHERE email=? AND role=? AND email_verified=0", (email.strip().lower(), role.strip().lower())).fetchone()
+        if not row:
+            raise ValueError("Unverified account not found")
+        connection.execute("UPDATE users SET verification_hash=?,verification_expires_at=?,updated_at=? WHERE id=?", (_token_hash(code), (_now() + timedelta(minutes=15)).isoformat(), _now().isoformat(), row["id"]))
+    delivered = _send_verification_email(row["email"], row["full_name"], code)
+    return {"status": "success", "email_delivery": "sent" if delivered else "not_configured"}
+
+
+def change_verification_email(old_email: str, new_email: str, role: str):
+    new_email = new_email.strip().lower()
+    if "@" not in new_email:
+        raise ValueError("Enter a valid email address")
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    try:
+        with _connect() as connection:
+            row = connection.execute("SELECT * FROM users WHERE email=? AND role=? AND email_verified=0", (old_email.strip().lower(), role.strip().lower())).fetchone()
+            if not row:
+                raise ValueError("Unverified account not found")
+            connection.execute("UPDATE users SET email=?,verification_hash=?,verification_expires_at=?,updated_at=? WHERE id=?", (new_email, _token_hash(code), (_now() + timedelta(minutes=15)).isoformat(), _now().isoformat(), row["id"]))
+    except sqlite3.IntegrityError as error:
+        raise ValueError("This email already has an account for the selected department") from error
+    delivered = _send_verification_email(new_email, row["full_name"], code)
+    return {"status": "success", "email_delivery": "sent" if delivered else "not_configured"}
+
+
+def login_user(email: str, password: str, role: str = ""):
+    with _connect() as connection:
+        rows = connection.execute("SELECT * FROM users WHERE email=?", (email.strip().lower(),)).fetchall()
+        matches = [row for row in rows if _password_valid(password, row["password_hash"]) and (not role or row["role"] == role.strip().lower())]
+        if not matches:
+            raise ValueError("Incorrect email, password, or department")
+        if len(matches) > 1:
+            raise ValueError("Select the department you want to login to")
+        row = matches[0]
         if row["status"] != "active":
             raise PermissionError(row["status"])
         token = secrets.token_urlsafe(40)
