@@ -34,7 +34,7 @@ from services.field_report_service import (
     list_reports,
     save_media,
 )
-from services.notification_service import maybe_dispatch_sms, notification_status
+from services.notification_service import maybe_dispatch_alerts, notification_status
 from services.sensor_service import (
     get_latest_sensor_data,
     get_sensor_history,
@@ -1931,7 +1931,7 @@ async def background_ai_loop():
 
 
 async def background_notification_loop():
-    """Optional SMS monitor; completely dormant unless explicitly enabled."""
+    """Optional multi-channel warning monitor; dormant unless enabled."""
     while True:
         try:
             await asyncio.sleep(int(os.getenv("ALERT_MONITOR_INTERVAL_SECONDS", "900")))
@@ -1940,7 +1940,7 @@ async def background_notification_loop():
             with state_lock:
                 fallback = latest_sensor_data.copy()
             fused = await asyncio.to_thread(get_fused_external_data, 26.1445, 91.7362, fallback)
-            await asyncio.to_thread(maybe_dispatch_sms, fused["operational"]["risk"], "North Eastern Region monitoring zone")
+            await asyncio.to_thread(maybe_dispatch_alerts, fused["operational"]["risk"], "North Eastern Region monitoring zone")
         except asyncio.CancelledError:
             raise
         except Exception:

@@ -1,5 +1,5 @@
 import { Bell, Languages, Radio } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const copy = {
   en: { title: "Multilingual Early Warning", subtitle: "Current risk converted into a community-ready message", risk: "risk", rain: "rainfall", river: "river level", action: "Avoid unstable slopes and follow official evacuation instructions.", enable: "Enable device alerts", ready: "Device alerts enabled" },
@@ -7,15 +7,24 @@ const copy = {
   as: { title: "বহুভাষিক আগতীয়া সতৰ্কবাণী", subtitle: "বৰ্তমান বিপদক সমাজৰ বাবে উপযোগী বাৰ্তালৈ ৰূপান্তৰ কৰা হৈছে", risk: "বিপদ", rain: "বৰষুণ", river: "নদীৰ স্তৰ", action: "অস্থিৰ ঢালৰ পৰা আঁতৰি থাকক আৰু চৰকাৰী স্থানান্তৰৰ নিৰ্দেশ মানক।", enable: "ডিভাইচ সতৰ্কতা চালু কৰক", ready: "ডিভাইচ সতৰ্কতা চালু আছে" },
 };
 
-export default function WarningCenter({ externalData, riskScore }) {
+export default function WarningCenter({ externalData, riskScore, apiBaseUrl }) {
   const [language, setLanguage] = useState("en");
   const [notificationState, setNotificationState] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
+  const [deliveryStatus, setDeliveryStatus] = useState(null);
   const text = copy[language];
   const risk = Number(riskScore ?? 0);
   const level = risk >= 80 ? "CRITICAL" : risk >= 60 ? "HIGH" : risk >= 35 ? "MODERATE" : "LOW";
   const features = externalData?.landslide_features ?? {};
   const place = externalData?.sources?.geocoding?.data?.results?.[0]?.formatted_address?.split(",").slice(0, 3).join(", ") || "Monitored zone";
   const message = useMemo(() => `${place}: ${text.risk} ${level} (${risk.toFixed(1)}/100), ${text.rain} ${Number(features.rainfall_mm ?? 0).toFixed(1)} mm, ${text.river} ${features.water_level != null ? `${Number(features.water_level).toFixed(2)} m` : "--"}. ${text.action}`, [features.rainfall_mm, features.water_level, level, place, risk, text]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadStatus = () => fetch(`${apiBaseUrl}/api/notifications/status`, { cache: "no-store" }).then((response) => response.json()).then((data) => mounted && setDeliveryStatus(data)).catch(() => {});
+    loadStatus();
+    const intervalId = setInterval(loadStatus, 30000);
+    return () => { mounted = false; clearInterval(intervalId); };
+  }, [apiBaseUrl]);
 
   const enableNotifications = async () => {
     if (!("Notification" in window)) return setNotificationState("unsupported");
@@ -35,7 +44,7 @@ export default function WarningCenter({ externalData, riskScore }) {
         <p>{message}</p>
         <button type="button" onClick={enableNotifications} disabled={notificationState === "granted"}><Bell size={14} />{notificationState === "granted" ? text.ready : text.enable}</button>
       </div>
-      <div className="warning-channels"><span><i className="online" /> In-app live</span><span><i className={notificationState === "granted" ? "online" : ""} /> Device notification</span><span><i /> SMS requires provider credentials</span></div>
+      <div className="warning-channels"><span><i className="online" /> In-app live</span><span><i className={notificationState === "granted" ? "online" : ""} /> Device notification</span><span><i className={deliveryStatus?.telegram_enabled ? "online" : ""} /> {deliveryStatus?.telegram_enabled ? "Telegram alerts live" : "Telegram setup pending"}</span><span><i className={deliveryStatus?.sms_configured ? "online" : ""} /> {deliveryStatus?.sms_configured ? "SMS configured" : "SMS optional"}</span></div>
     </section>
   );
 }

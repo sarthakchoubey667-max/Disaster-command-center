@@ -66,6 +66,8 @@ The target column is `landslide_event` (`0` or `1`). Do not describe the heurist
 
 ## Automated warning delivery
 
-In-app multilingual warnings and opt-in browser notifications work without credentials. Automated SMS is disabled by default. To enable it, set `ALERT_DELIVERY_ENABLED=true`, comma-separated `ALERT_RECIPIENTS`, and `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`. The backend checks every `ALERT_MONITOR_INTERVAL_SECONDS`, sends only above `ALERT_RISK_THRESHOLD`, and applies `ALERT_COOLDOWN_SECONDS` to prevent repeated messages. Protect recipient consent and comply with telecom rules before enabling delivery.
+In-app multilingual warnings and opt-in browser notifications work without credentials. Free Telegram delivery is supported through the official Bot API. Set `ALERT_DELIVERY_ENABLED=true`, `TELEGRAM_ALERTS_ENABLED=true`, `TELEGRAM_BOT_TOKEN`, and comma-separated `TELEGRAM_CHAT_IDS`. Users must start the bot or join the configured group/channel before it can notify them. The backend checks every `ALERT_MONITOR_INTERVAL_SECONDS`, sends only above `ALERT_RISK_THRESHOLD`, and applies `ALERT_COOLDOWN_SECONDS` to prevent repeated messages.
+
+Twilio SMS remains optional and disabled when credentials are absent. To use it, set comma-separated `ALERT_RECIPIENTS`, plus `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER`. Never commit bot tokens, phone numbers, or provider credentials. Notify only users who have consented to receive alerts.
 
 Keep provider keys backend-only. Never put secrets in `VITE_*` variables because Vite embeds them in browser assets.

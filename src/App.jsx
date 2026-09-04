@@ -1541,7 +1541,7 @@ function App() {
 
           <RescueTeams />
 
-          <WarningCenter externalData={externalData} riskScore={fusedRiskScore} />
+          <WarningCenter externalData={externalData} riskScore={fusedRiskScore} apiBaseUrl={API_BASE_URL} />
 
           {/* FOOTER */}
 
