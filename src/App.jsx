@@ -82,6 +82,7 @@ function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mapExpanded, setMapExpanded] = useState(false);
   const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const [selectedSourceKey, setSelectedSourceKey] = useState(null);
 
   const openSection = (section) => {
     setActiveSection(section);
@@ -619,6 +620,9 @@ function App() {
     { key: "river", target: "Sensor panel + water risk", use: "Nearest-station level replaces simulation and contributes to risk." },
     { key: "satellite", target: "Remote observation coverage", use: "Scene count, capture freshness and cloud cover confirm visibility." },
   ].map((usage) => ({ ...usage, source: sourceCards.find((source) => source.key === usage.key) }));
+  const selectedSource = sourceCards.find((source) => source.key === selectedSourceKey);
+  const selectedResponse = selectedSourceKey ? externalSources[selectedSourceKey] : null;
+  const selectedUsage = operationalUses.find((usage) => usage.key === selectedSourceKey);
 
   /*
    * ------------------------------------------------------------
@@ -1460,14 +1464,15 @@ function App() {
                 const isLive = response?.status === "success";
                 const Icon = source.icon;
                 return (
-                  <article className={`external-source-card ${isLive ? "live" : "fallback"}`} key={source.key}>
+                  <button type="button" className={`external-source-card ${isLive ? "live" : "fallback"}`} key={source.key} onClick={() => setSelectedSourceKey(source.key)} aria-label={`Open ${source.label} details`}>
                     <div className="external-source-icon"><Icon size={19} /></div>
                     <div className="external-source-copy">
                       <div className="external-source-name"><strong>{source.label}</strong><span>{isLive ? "LIVE" : "FALLBACK"}</span></div>
                       <p>{source.value}</p>
                       <small>{isLive ? source.detail : response?.message ?? source.detail}</small>
                     </div>
-                  </article>
+                    <span className="source-open-hint">Tap to open →</span>
+                  </button>
                 );
               })}
             </div>
@@ -1566,6 +1571,28 @@ function App() {
           </footer>
 
         </main>
+
+        {selectedSource && (
+          <div className="source-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="source-detail-title" onClick={() => setSelectedSourceKey(null)}>
+            <div className="source-modal" onClick={(event) => event.stopPropagation()}>
+              <button type="button" className="close-ai" aria-label="Close service details" onClick={() => setSelectedSourceKey(null)}>×</button>
+              <span className="ai-modal-kicker">EXTERNAL INTELLIGENCE SERVICE</span>
+              <div className="source-modal-title">
+                {(() => { const SourceIcon = selectedSource.icon; return <SourceIcon size={25} />; })()}
+                <div><h2 id="source-detail-title">{selectedSource.label}</h2><span className={selectedResponse?.status === "success" ? "source-state live" : "source-state fallback"}>{selectedResponse?.status === "success" ? "LIVE" : "FALLBACK"}</span></div>
+              </div>
+              <div className="source-detail-grid">
+                <div><span>Current reading</span><strong>{selectedSource.value}</strong></div>
+                <div><span>Last checked</span><strong>{formatTimestamp(selectedResponse?.timestamp)}</strong></div>
+                <div><span>Used in</span><strong>{selectedUsage?.target}</strong></div>
+                <div><span>Provider</span><strong>{selectedResponse?.source ?? selectedSource.label}</strong></div>
+              </div>
+              <div className="source-purpose"><strong>How this works in the app</strong><p>{selectedUsage?.use}</p></div>
+              <div className="source-message"><strong>{selectedResponse?.status === "success" ? "Service response" : "Why fallback is showing"}</strong><p>{selectedResponse?.message ?? selectedSource.detail}</p></div>
+              <button type="button" className="source-close-button" onClick={() => setSelectedSourceKey(null)}>Done</button>
+            </div>
+          </div>
+        )}
 
         {/* =====================================================
             AI ANALYSIS MODAL
