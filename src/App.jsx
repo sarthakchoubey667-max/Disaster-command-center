@@ -6,6 +6,7 @@ import {
   CloudRain,
   Droplets,
   MapPin,
+  LogOut,
   Menu,
   Mountain,
   Radio,
@@ -22,6 +23,7 @@ import FieldReports from "./FieldReports";
 import WarningCenter from "./WarningCenter";
 import RescueTeams from "./RescueTeams";
 import SensorChart from "./SensorChart";
+import OperatorApprovals from "./OperatorApprovals";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||"http://127.0.0.1:8000";
@@ -62,7 +64,7 @@ const normalizeArray = (value) => {
   return [];
 };
 
-function App() {
+function App({ session, onLogout }) {
   const [sensorData, setSensorData] = useState(null);
   const [alertsData, setAlertsData] = useState(null);
   const [aiData, setAiData] = useState(null);
@@ -1010,10 +1012,12 @@ function App() {
                 </div>
 
                 <div>
-                  <strong>Operator</strong>
+                  <strong>{session?.user?.full_name || "Operator"}</strong>
                   <small>Control Room</small>
                 </div>
               </div>
+
+              <button type="button" className="operator-logout" onClick={onLogout} aria-label="Logout operator"><LogOut size={17} /></button>
 
             </div>
           </header>
@@ -1540,6 +1544,8 @@ function App() {
           <FieldReports apiBaseUrl={API_BASE_URL} onReportsChange={setFieldReports} />
 
           <RescueTeams />
+
+          <OperatorApprovals apiBaseUrl={API_BASE_URL} token={session?.token} />
 
           <WarningCenter externalData={externalData} riskScore={fusedRiskScore} apiBaseUrl={API_BASE_URL} />
 

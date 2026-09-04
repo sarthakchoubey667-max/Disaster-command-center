@@ -10,7 +10,7 @@ from threading import RLock
 from typing import Iterator, Mapping, Optional
 
 import joblib
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -35,6 +35,7 @@ from services.field_report_service import (
     save_media,
 )
 from services.notification_service import maybe_dispatch_alerts, notification_status
+from services.auth_service import decide_user, initialize_auth_store, list_pending_users, login_user, logout_token, register_user, user_from_token, verify_email
 from services.sensor_service import (
     get_latest_sensor_data,
     get_sensor_history,
@@ -199,6 +200,53 @@ class SensorData(BaseModel):
         ge=0,
         le=500,
     )
+
+
+# ============================================================
+# AUTHENTICATION MODELS / GUARDS
+# ============================================================
+
+class RegistrationData(BaseModel):
+    full_name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=5, max_length=180)
+    mobile: str = Field(default="", max_length=30)
+    password: str = Field(min_length=8, max_length=128)
+    role: str
+    location: str = Field(default="", max_length=150)
+    official_details: dict = Field(default_factory=dict)
+
+
+class EmailVerificationData(BaseModel):
+    email: str
+    code: str = Field(min_length=6, max_length=6)
+
+
+class LoginData(BaseModel):
+    email: str
+    password: str
+
+
+class ApprovalData(BaseModel):
+    approve: bool
+
+
+def _bearer_token(authorization: str | None):
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return ""
+    return authorization.split(" ", 1)[1].strip()
+
+
+def require_user(authorization: str | None = Header(default=None)):
+    user = user_from_token(_bearer_token(authorization))
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user
+
+
+def require_operator(user: dict = Depends(require_user)):
+    if user["role"] != "operator":
+        raise HTTPException(status_code=403, detail="Operator access required")
+    return user
 
 
 # ============================================================
@@ -1957,6 +2005,7 @@ async def lifespan(app: FastAPI):
     global background_task, notification_task
 
     initialize_report_store()
+    initialize_auth_store()
 
     background_task = asyncio.create_task(
         background_ai_loop()
@@ -2096,6 +2145,66 @@ def system_status():
             "current_risk_level": current_level,
             "alerts": 3,
         }
+
+
+# ============================================================
+# AUTHENTICATION / ROLE ACCESS
+# ============================================================
+
+@app.post("/api/auth/register", status_code=201)
+def auth_register(payload: RegistrationData):
+    try:
+        return register_user(payload.model_dump())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except Exception as error:
+        logger.exception("Registration email delivery failed")
+        raise HTTPException(status_code=503, detail="Account could not be created right now") from error
+
+
+@app.post("/api/auth/verify-email")
+def auth_verify_email(payload: EmailVerificationData):
+    try:
+        return verify_email(payload.email, payload.code)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/auth/login")
+def auth_login(payload: LoginData):
+    try:
+        return login_user(payload.email, payload.password)
+    except PermissionError as error:
+        status = str(error)
+        message = "Verify your email first" if status == "email_verification" else "Your official account is waiting for operator approval" if status == "pending_approval" else "This account is not active"
+        raise HTTPException(status_code=403, detail=message) from error
+    except ValueError as error:
+        raise HTTPException(status_code=401, detail=str(error)) from error
+
+
+@app.get("/api/auth/me")
+def auth_me(user: dict = Depends(require_user)):
+    return {"status": "success", "user": user}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(authorization: str | None = Header(default=None), user: dict = Depends(require_user)):
+    logout_token(_bearer_token(authorization))
+    return {"status": "success"}
+
+
+@app.get("/api/operator/pending-accounts")
+def pending_accounts(operator: dict = Depends(require_operator)):
+    users = list_pending_users()
+    return {"status": "success", "count": len(users), "users": users}
+
+
+@app.post("/api/operator/accounts/{user_id}/decision")
+def account_decision(user_id: int, payload: ApprovalData, operator: dict = Depends(require_operator)):
+    try:
+        return decide_user(user_id, payload.approve)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 # ============================================================

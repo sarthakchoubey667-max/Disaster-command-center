@@ -9,6 +9,7 @@
 
 body { margin: 0; background: #090d22; }
 button { font: inherit; cursor: pointer; }
+.operator-logout { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgb(255 95 126 / 22%); border-radius: 10px; color: #ff8ba2; background: rgb(255 79 113 / 9%); }
 html { scroll-behavior: smooth; }
 .panel[id], main[id] { scroll-margin-top: 18px; }
 

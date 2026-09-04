@@ -70,4 +70,10 @@ In-app multilingual warnings and opt-in browser notifications work without crede
 
 Twilio SMS remains optional and disabled when credentials are absent. To use it, set comma-separated `ALERT_RECIPIENTS`, plus `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER`. Never commit bot tokens, phone numbers, or provider credentials. Notify only users who have consented to receive alerts.
 
+## Secure multi-role portal
+
+The React entry point now provides verified access for `citizen`, `police`, `fire`, `rescue`, and a private `operator` role. Citizen accounts become active after email verification. Official responder accounts move to `pending_approval` after email verification and must be approved from the Operator Command Center. Operator registration is never exposed publicly.
+
+Set `OPERATOR_NAME`, `OPERATOR_EMAIL`, and a strong `OPERATOR_PASSWORD` in the backend Render service. For real email codes, create a Brevo transactional-email API key and set `BREVO_API_KEY`, `AUTH_EMAIL_FROM`, and optionally `AUTH_EMAIL_FROM_NAME`. Keep `AUTH_DEV_SHOW_VERIFICATION_CODE=false` on deployed environments. Authentication data uses the same `DISASTER_DATA_DIR`; attach a persistent Render disk for durable accounts and sessions.
+
 Keep provider keys backend-only. Never put secrets in `VITE_*` variables because Vite embeds them in browser assets.
