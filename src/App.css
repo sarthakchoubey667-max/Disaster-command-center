@@ -79,3 +79,19 @@ nav a.active { border-left: 3px solid #5fe6ff; box-shadow: inset 0 0 18px rgb(95
 @media (max-width: 550px) { .stats-grid, .sensor-data, .external-source-grid, .satellite-insight, .fusion-strip, .field-report-form, .coordinate-fields, .report-meta-fields, .warning-message { grid-template-columns: 1fr; }.external-sources-header, .operational-usage-heading { align-items: flex-start; flex-direction: column; }.field-report-form textarea, .coordinate-fields, .report-meta-fields, .media-upload, .submit-report, .field-report-message { grid-column: 1; }.coordinate-fields button { padding: 10px 11px; }.usage-row { grid-template-columns: 28px 1fr; }.usage-arrow { display: none; }.usage-target { grid-column: 2; }.warning-level { width: fit-content; }.live-status { display: none; }footer { flex-direction: column; gap: 5px; } }
 @media (max-width: 550px) { .source-detail-grid { grid-template-columns: 1fr; }.source-modal { padding: 22px 16px; } }
 .alert-language { margin-left: 6px; padding: 2px 5px; border-radius: 5px; color: #65e4d8; background: rgb(45 212 191 / 12%); font-size: 7px; text-transform: uppercase; }
+
+/* Motion system: restrained transitions keep the command center feeling live. */
+@keyframes dashboard-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes card-enter { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.72); } }
+@keyframes badge-pop { 0% { transform: scale(.84); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.main { animation: dashboard-enter .45s ease both; }
+.stats-grid > *, .content-grid > *, .lower-grid > *, .external-sources, .field-reports, .rescue-teams, .personnel-directory, .approvals-panel, .warning-center { animation: card-enter .5s cubic-bezier(.2,.75,.25,1) both; }
+.stats-grid > :nth-child(2), .content-grid > :nth-child(2) { animation-delay: .06s; }.stats-grid > :nth-child(3), .lower-grid > :nth-child(2) { animation-delay: .12s; }.stats-grid > :nth-child(4) { animation-delay: .18s; }
+.stat-card, .panel { transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease; }.stat-card:hover { transform: translateY(-3px); border-color: rgb(95 230 255 / 34%); box-shadow: 0 16px 34px rgb(0 0 0 / 23%); }
+nav a { position: relative; overflow: hidden; }nav a svg { transition: transform .2s ease, color .2s ease; }nav a:hover svg, nav a.active svg { transform: scale(1.12); color: #63e6f7; }
+.status-dot, .live-status span, .sensor-online span { animation: live-pulse 1.8s ease-in-out infinite; }
+.nav-badge, .alert-count { animation: badge-pop .35s ease both; }
+button { transition: transform .16s ease, filter .16s ease, border-color .16s ease; }button:hover { filter: brightness(1.09); }button:active { transform: scale(.97); }
+.alert-item { transition: background-color .2s ease, padding-left .2s ease; }.alert-item:hover { padding-left: 6px; background: rgb(99 102 241 / 5%); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
