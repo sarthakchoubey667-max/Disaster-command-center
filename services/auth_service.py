@@ -227,7 +227,7 @@ def list_department_users():
     with _connect() as connection:
         rows = connection.execute(
             """SELECT * FROM users
-               WHERE role IN ('police', 'fire', 'rescue', 'hospital')
+               WHERE role IN ('citizen', 'police', 'fire', 'rescue', 'hospital')
                  AND email_verified=1
                ORDER BY role, full_name"""
         ).fetchall()

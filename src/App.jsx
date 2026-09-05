@@ -66,6 +66,13 @@ const normalizeArray = (value) => {
   return [];
 };
 
+const supportedAlertLanguage = (alert) => {
+  const text = `${alert?.title ?? ""} ${alert?.description ?? ""}`;
+  if (/[\u0900-\u097f]/.test(text)) return "Hindi";
+  if (/[\u0980-\u0dff]/.test(text)) return null;
+  return "English";
+};
+
 function App({ session, onLogout }) {
   const [sensorData, setSensorData] = useState(null);
   const [alertsData, setAlertsData] = useState(null);
@@ -446,16 +453,22 @@ function App({ session, onLogout }) {
   const displayedSensors = operational?.sensors
     ? { ...sensorData, ...operational.sensors }
     : sensorData;
-  const officialAlerts = normalizeArray(operational?.alerts).map((alert) => ({
-    ...alert,
-    level: "warning",
-    location: alert?.area ?? alert?.location ?? "India",
-    time: alert?.published ? formatTimestamp(alert.published) : "Official feed",
-  }));
+  const officialAlerts = normalizeArray(operational?.alerts)
+    .map((alert) => ({
+      ...alert,
+      language: supportedAlertLanguage(alert),
+      level: "warning",
+      location: alert?.area ?? alert?.location ?? "India",
+      time: alert?.published ? formatTimestamp(alert.published) : "Official feed",
+    }))
+    .filter((alert) => alert.language);
+  const fallbackAlerts = normalizeArray(alertsData?.alerts ?? alertsData)
+    .map((alert) => ({ ...alert, language: supportedAlertLanguage(alert) }))
+    .filter((alert) => alert.language);
   const alertList =
     externalSources.alerts?.status === "success" && officialAlerts.length > 0
       ? officialAlerts
-      : normalizeArray(alertsData?.alerts ?? alertsData);
+      : fallbackAlerts;
 
   const recommendationList = normalizeArray(
     aiData?.recommendations
@@ -939,7 +952,7 @@ function App({ session, onLogout }) {
 
             <a href="#personnel-directory" className={activeSection === "personnel-directory" ? "active" : ""} onClick={() => openSection("personnel-directory")}>
               <ContactRound size={19} />
-              Personnel
+              Users &amp; Personnel
             </a>
 
             <a href="#alerts" className={activeSection === "alerts" ? "active" : ""} onClick={() => openSection("alerts")}>
@@ -977,7 +990,7 @@ function App({ session, onLogout }) {
 
         {mobileNavOpen && <button className="sidebar-backdrop" type="button" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
 
-        <main className="main" id="dashboard">
+        <main className={`main ${activeSection === "personnel-directory" ? "personnel-view" : ""}`} id="dashboard">
 
           {/* HEADER */}
 
@@ -1150,6 +1163,7 @@ function App({ session, onLogout }) {
                             <MapPin size={13} />
                             {alert?.location ??
                               "Unknown location"}
+                            <b className="alert-language">{alert?.language || "English"}</b>
                           </span>
 
                         </div>
