@@ -10,5 +10,13 @@ createRoot(document.getElementById("root")).render(
 );
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+  window.addEventListener("load", async () => {
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    if (registration.waiting) window.dispatchEvent(new Event("disasterai-update-ready"));
+    registration.addEventListener("updatefound", () => registration.installing?.addEventListener("statechange", () => {
+      if (registration.installing?.state === "installed" && navigator.serviceWorker.controller) window.dispatchEvent(new Event("disasterai-update-ready"));
+    }));
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (!refreshing) { refreshing = true; window.location.reload(); } });
+  });
 }

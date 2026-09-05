@@ -2,9 +2,18 @@
   "name": "DisasterAI Command Center",
   "short_name": "DisasterAI",
   "description": "Landslide early warning, GIS monitoring and offline field reporting",
-  "start_url": "/",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
+  "lang": "en-IN",
+  "categories": ["emergency", "weather", "navigation", "utilities"],
   "background_color": "#090d22",
   "theme_color": "#11194a",
-  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }],
+  "shortcuts": [
+    { "name": "Emergency Alerts", "short_name": "Alerts", "url": "/?source=pwa#alerts", "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Disaster Map", "short_name": "Map", "url": "/?source=pwa#disaster-map", "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }] }
+  ]
 }
