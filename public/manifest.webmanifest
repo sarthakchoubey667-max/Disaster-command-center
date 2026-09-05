@@ -11,9 +11,9 @@
   "categories": ["emergency", "weather", "navigation", "utilities"],
   "background_color": "#090d22",
   "theme_color": "#11194a",
-  "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }],
+  "icons": [{ "src": "/disasterai-logo.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable" }],
   "shortcuts": [
-    { "name": "Emergency Alerts", "short_name": "Alerts", "url": "/?source=pwa#alerts", "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }] },
-    { "name": "Disaster Map", "short_name": "Map", "url": "/?source=pwa#disaster-map", "icons": [{ "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }] }
+    { "name": "Emergency Alerts", "short_name": "Alerts", "url": "/?source=pwa#alerts", "icons": [{ "src": "/disasterai-logo.png", "sizes": "1024x1024", "type": "image/png" }] },
+    { "name": "Disaster Map", "short_name": "Map", "url": "/?source=pwa#disaster-map", "icons": [{ "src": "/disasterai-logo.png", "sizes": "1024x1024", "type": "image/png" }] }
   ]
 }

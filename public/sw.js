@@ -1,5 +1,5 @@
-const CACHE = "disaster-ai-shell-v4";
-const SHELL = ["/offline.html", "/manifest.webmanifest", "/app-icon.svg", "/disasterai-logo.png", "/favicon.svg"];
+const CACHE = "disaster-ai-shell-v5";
+const SHELL = ["/offline.html", "/manifest.webmanifest", "/disasterai-logo.png", "/favicon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
