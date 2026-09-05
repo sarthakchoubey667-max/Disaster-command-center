@@ -22,7 +22,7 @@ export default function OperatorDirectory({ apiBaseUrl, token }) {
       setMessage("");
     } catch (error) { setMessage(error.message); }
   }, [apiBaseUrl, token]);
-  useEffect(() => { load(); const timer = setInterval(load, 30000); return () => clearInterval(timer); }, [load]);
+  useEffect(() => { load(); const timer = setInterval(load, 5000); return () => clearInterval(timer); }, [load]);
   const visible = useMemo(() => users.filter((user) => JSON.stringify(user).toLowerCase().includes(query.toLowerCase())), [query, users]);
   const counts = useMemo(() => Object.keys(roleMeta).map((role) => ({ role, count: users.filter((user) => user.role === role).length })), [users]);
 

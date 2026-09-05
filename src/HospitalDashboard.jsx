@@ -33,7 +33,7 @@ export default function HospitalDashboard({ apiBaseUrl, session, onLogout }) {
     } catch (error) { setMessage(error.message); }
   }, [apiBaseUrl, headers]);
 
-  useEffect(() => { load(); const timer = setInterval(load, 30000); return () => clearInterval(timer); }, [load]);
+  useEffect(() => { load(); const timer = setInterval(load, 5000); return () => clearInterval(timer); }, [load]);
   const update = (key, value) => setResources((current) => ({ ...current, [key]: value }));
   const save = async () => {
     const response = await fetch(`${apiBaseUrl}/api/hospital/status`, { method: "PUT", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(resources) });

@@ -76,6 +76,8 @@ The React entry point now provides verified access for `citizen`, `police`, `fir
 
 Hospital accounts include registration ID/type, address and coordinates, emergency contact, bed/ICU/emergency capacity, ambulances and blood-bank information. Their live dashboard can update beds, ICU, oxygen, ambulances, incoming cases, admitted casualties and shortages. Rescue teams can send vehicle, equipment, road blockage, red/yellow/green triage and destination-hospital updates to the shared operations data layer.
 
-Set `OPERATOR_NAME`, `OPERATOR_EMAIL`, and a strong `OPERATOR_PASSWORD` in the backend Render service. For real email codes, create a Brevo transactional-email API key and set `BREVO_API_KEY`, `AUTH_EMAIL_FROM`, and optionally `AUTH_EMAIL_FROM_NAME`. Keep `AUTH_DEV_SHOW_VERIFICATION_CODE=false` on deployed environments. Authentication data uses the same `DISASTER_DATA_DIR`; attach a persistent Render disk for durable accounts and sessions.
+Set `OPERATOR_NAME`, `OPERATOR_EMAIL`, and a strong `OPERATOR_PASSWORD` in the backend Render service. For real email codes, create a Brevo transactional-email API key and set `BREVO_API_KEY`, `AUTH_EMAIL_FROM`, and optionally `AUTH_EMAIL_FROM_NAME`. Keep `AUTH_DEV_SHOW_VERIFICATION_CODE=false` on deployed environments.
+
+For permanent production accounts, create a new Render PostgreSQL database and add its **Internal Database URL** to the backend service as `DATABASE_URL`. Redeploying then creates a fresh database containing only the bootstrapped private operator; every newly verified user, official detail, approval and login session remains stored across later deploys. Without `DATABASE_URL`, authentication falls back to SQLite for local development and may be lost on an ephemeral Render filesystem.
 
 Keep provider keys backend-only. Never put secrets in `VITE_*` variables because Vite embeds them in browser assets.

@@ -45,7 +45,7 @@ export default function RoleDashboard({ apiBaseUrl, session, onLogout }) {
         if (mounted) { setExternalData(fusion); setAlerts(alertData.alerts || alertData.data || []); }
       } catch { /* the last safe snapshot remains visible */ }
     };
-    load(); const timer = setInterval(load, 30000); return () => { mounted = false; clearInterval(timer); };
+    load(); const timer = setInterval(load, 5000); return () => { mounted = false; clearInterval(timer); };
   }, [apiBaseUrl]);
   const risk = Number(externalData?.operational?.risk?.score ?? 0);
   const reports = Number(externalData?.landslide_features?.field_report_count ?? 0);
