@@ -29,3 +29,11 @@
 .app-action { animation: install-rise .42s cubic-bezier(.2,.8,.25,1) both; }.app-action-icon { animation: gentle-glow 2.4s ease-in-out infinite; }
 .auth-submit, .resource-save { background-size: 160% 100%; transition: background-position .3s ease, transform .16s ease; }.auth-submit:hover, .resource-save:hover { background-position: 100% 0; }
 @media (prefers-reduced-motion: reduce) { .auth-card, .role-welcome, .hospital-welcome, .role-stat-grid > article, .directory-card, .app-action, .app-action-icon { animation: none !important; transition: none !important; } }
+@keyframes hero-gradient { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes selected-role { 0%, 100% { box-shadow: 0 0 0 rgb(67 219 201 / 0%); } 50% { box-shadow: 0 0 18px rgb(67 219 201 / 22%); } }
+@keyframes verified-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.auth-hero h1 em { color: transparent; background: linear-gradient(90deg, #66e7da, #5bbcff, #a98bff, #66e7da); background-size: 250% 100%; background-clip: text; -webkit-background-clip: text; animation: hero-gradient 4s ease infinite; }
+.role-picker button.selected { animation: selected-role 2.2s ease-in-out infinite; }
+.auth-live { position: relative; overflow: hidden; }.auth-live::after { content: ""; position: absolute; width: 70px; height: 70px; right: -40px; border: 1px solid rgb(80 228 180 / 28%); border-radius: 50%; animation: verified-orbit 5s linear infinite; }
+.role-brand > svg, .directory-role > span { animation: icon-float 3.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .auth-hero h1 em, .role-picker button.selected, .auth-live::after, .role-brand > svg, .directory-role > span { animation: none !important; } }
