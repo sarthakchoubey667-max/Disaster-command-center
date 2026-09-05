@@ -100,6 +100,8 @@ button { transition: transform .16s ease, filter .16s ease, border-color .16s ea
 @keyframes shield-breathe { 0%, 100% { box-shadow: 0 8px 20px rgb(255 79 113 / 35%); } 50% { box-shadow: 0 8px 30px rgb(255 111 76 / 65%); } }
 .logo-icon { animation: shield-breathe 2.6s ease-in-out infinite; }
 .logo-icon img { width: 32px; height: 35px; object-fit: contain; border-radius: 7px; }
+.logo-icon { background: transparent; box-shadow: 0 8px 22px rgb(111 54 255 / 28%); }
+.logo-icon img { width: 43px; height: 46px; }
 .stat-card .stat-icon { animation: icon-float 3s ease-in-out infinite; }.stat-card:nth-child(2) .stat-icon { animation-delay: .35s; }.stat-card:nth-child(3) .stat-icon { animation-delay: .7s; }.stat-card:nth-child(4) .stat-icon { animation-delay: 1.05s; }
 nav a.active::after { content: ""; position: absolute; inset: 0 auto 0 -20%; width: 28%; background: linear-gradient(90deg, transparent, rgb(103 232 249 / 18%), transparent); transform: skewX(-18deg); animation: nav-scan 2.8s ease-in-out infinite; }
 .map-button, .view-alerts { position: relative; overflow: hidden; }.map-button::after, .view-alerts::after { content: ""; position: absolute; inset: 0 auto 0 -30%; width: 22%; background: linear-gradient(90deg, transparent, rgb(255 255 255 / 18%), transparent); transform: skewX(-20deg); animation: nav-scan 3.5s ease-in-out infinite; }

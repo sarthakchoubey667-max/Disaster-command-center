@@ -44,3 +44,5 @@
 @media (prefers-reduced-motion: reduce) { .welcome-screen *, .welcome-screen *::after { animation: none !important; } }
 .welcome-logo img { width: 34px; height: 37px; object-fit: contain; border-radius: 8px; }.radar-center img { width: 53px; height: 58px; object-fit: contain; border-radius: 12px; filter: drop-shadow(0 0 14px rgb(128 69 255 / 45%)); }
 .auth-brand img { width: 43px; height: 46px; padding: 5px; object-fit: contain; border-radius: 13px; background: #11152a; box-shadow: 0 8px 24px rgb(111 54 255 / 28%); }
+.welcome-logo > span { background: transparent; box-shadow: 0 8px 26px rgb(111 54 255 / 28%); }
+.welcome-logo img { width: 46px; height: 49px; border-radius: 10px; }
