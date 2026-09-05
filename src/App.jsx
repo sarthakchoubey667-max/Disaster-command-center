@@ -4,6 +4,7 @@ import {
   Bell,
   Camera,
   CloudRain,
+  ContactRound,
   Droplets,
   MapPin,
   LogOut,
@@ -24,6 +25,7 @@ import WarningCenter from "./WarningCenter";
 import RescueTeams from "./RescueTeams";
 import SensorChart from "./SensorChart";
 import OperatorApprovals from "./OperatorApprovals";
+import OperatorDirectory from "./OperatorDirectory";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||"http://127.0.0.1:8000";
@@ -935,6 +937,11 @@ function App({ session, onLogout }) {
               Rescue Teams
             </a>
 
+            <a href="#personnel-directory" className={activeSection === "personnel-directory" ? "active" : ""} onClick={() => openSection("personnel-directory")}>
+              <ContactRound size={19} />
+              Personnel
+            </a>
+
             <a href="#alerts" className={activeSection === "alerts" ? "active" : ""} onClick={() => openSection("alerts")}>
               <Bell size={19} />
               Alerts
@@ -1544,6 +1551,8 @@ function App({ session, onLogout }) {
           <FieldReports apiBaseUrl={API_BASE_URL} onReportsChange={setFieldReports} />
 
           <RescueTeams />
+
+          <OperatorDirectory apiBaseUrl={API_BASE_URL} token={session?.token} />
 
           <OperatorApprovals apiBaseUrl={API_BASE_URL} token={session?.token} />
 

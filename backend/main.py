@@ -36,7 +36,7 @@ from services.field_report_service import (
     save_media,
 )
 from services.notification_service import maybe_dispatch_alerts, notification_status
-from services.auth_service import change_verification_email, decide_user, initialize_auth_store, list_pending_users, login_user, logout_token, register_user, resend_verification, user_from_token, verify_email
+from services.auth_service import change_verification_email, decide_user, initialize_auth_store, list_department_users, list_pending_users, login_user, logout_token, register_user, resend_verification, user_from_token, verify_email
 from services.hospital_service import add_rescue_update, get_hospital_status, initialize_hospital_store, list_rescue_updates, update_hospital_status
 from services.sensor_service import (
     get_latest_sensor_data,
@@ -2260,6 +2260,12 @@ def auth_logout(authorization: str | None = Header(default=None), user: dict = D
 @app.get("/api/operator/pending-accounts")
 def pending_accounts(operator: dict = Depends(require_operator)):
     users = list_pending_users()
+    return {"status": "success", "count": len(users), "users": users}
+
+
+@app.get("/api/operator/department-directory")
+def department_directory(operator: dict = Depends(require_operator)):
+    users = list_department_users()
     return {"status": "success", "count": len(users), "users": users}
 
 

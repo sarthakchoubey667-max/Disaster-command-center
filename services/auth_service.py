@@ -222,6 +222,18 @@ def list_pending_users():
         return [_public_user(row) for row in rows]
 
 
+def list_department_users():
+    """Return verified department accounts for the private operator directory."""
+    with _connect() as connection:
+        rows = connection.execute(
+            """SELECT * FROM users
+               WHERE role IN ('police', 'fire', 'rescue', 'hospital')
+                 AND email_verified=1
+               ORDER BY role, full_name"""
+        ).fetchall()
+        return [_public_user(row) for row in rows]
+
+
 def decide_user(user_id: int, approve: bool):
     status = "active" if approve else "rejected"
     with _connect() as connection:
