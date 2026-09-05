@@ -915,7 +915,7 @@ function App({ session, onLogout }) {
 
           <div className="logo">
             <div className="logo-icon">
-              <ShieldAlert size={25} />
+              <img src="/disasterai-logo.png" alt="" />
             </div>
 
             <div>
